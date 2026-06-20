@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedural 3D Solar System</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: 'Consolas', monospace;
+        }
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #ffffff;
+            text-shadow: 0 0 5px #000;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        h1 { margin: 0 0 5px 0; font-size: 18px; color: #ffcc00; letter-spacing: 1px; }
+        p { margin: 0; font-size: 12px; color: #bbbbbb; line-height: 1.5; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="ui-overlay">
+        <h1>Orrery Engine v2.5</h1>
+        <p>• Left Click + Drag: Orbit Camera</p>
+        <p>• Scroll Wheel: Deep Zoom</p>
+        <p style="color: #4ae3ff; margin-top: 5px;">• Procedural Textures Enabled (Offline-Safe)</p>
+    </div>
+
+    <script>
+        /**
+         * @fileoverview Offline-Safe 3D Orrery Simulation Engine
+         * @author Alexandru Bratosin
+         * @description Standalone HTML5 simulation using procedural 2D canvas texture
+         * generation to bypass browser CORS asset locking.
+         */
+
+        // --- 1. Core Engine Setup ---
+        // Initialize the 3D world container (Scene), perspective lens (Camera), and WebGL rendering engine
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 60, 110);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.25;
+        document.body.appendChild(renderer.domElement);
+
+        // Add user-interactive mouse controls to swing, zoom, and navigate around space smoothly
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // --- 2. Solar Lighting Configuration ---
+        // The Sun acts as a central bulb radiating pure white light out into dark space
+        const sunLight = new THREE.PointLight(0xffffff, 3.5, 400, 0.5);
+        scene.add(sunLight);
+
+        // Ambient backlight ensures that the dark sides of planets aren't completely invisible
+        const ambientLight = new THREE.AmbientLight(0x252525);
+        scene.add(ambientLight);
+
+        // --- 3. COMPONENT: Procedural Texture Synthesizer ---
+        // Draws unique surface maps onto a hidden 2D canvas buffer and converts it directly into a WebGL surface map.
+        // This stops browsers from breaking with blank planets when opened straight from a local folder.
+        function createProceduralTexture(type, baseColor, detailColor) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // Apply the planet's primary background base color
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Generate detailed surface maps using mathematical randomization patterns
+            if (type === 'bands') {
+                // Generates alternating gas-giant horizontal layers (Jupiter, Saturn, Neptune, Uranus)
+                for (let y = 0; y < canvas.height; y += 4) {
+                    if (Math.random() > 0.4) {
+                        ctx.fillStyle = (Math.random() > 0.5) ? detailColor : '#443322';
+                        ctx.fillRect(0, y, canvas.width, Math.random() * 12);
+                    }
+                }
+            } else if (type === 'craters') {
+                // Generates round, impact-crater surface blobs (Mercury, Mars)
+                ctx.fillStyle = detailColor;
+                for (let i = 0; i < 40; i++) {
+                    ctx.beginPath();
+                    ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (type === 'earth') {
+                // Generates overlapping landmass shapes across the blue ocean canvas frame
+                ctx.fillStyle = detailColor;
+                for (let i = 0; i < 15; i++) {
+                    ctx.beginPath();
+                    const radius = 40 + Math.random() * 50; // Dynamic landscape sizes
+                    ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Convert raw canvas pixels into a standard light-mappable Three.js texture asset
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- 4. The Sun Mesh Model ---
+        const sunGeometry = new THREE.SphereGeometry(7, 64, 64);
+        const sunMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xffaa00,
+            map: createProceduralTexture('bands', '#ffcc00', '#ff5500')
+        });
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        scene.add(sun);
+
+        // --- 5. Planet Struct Database Registry ---
+        // Organizes each celestial body's size scale, orbit distance steps, motion speed, custom textures, and geometric axial tilts
+        const planetData = [
+            { name: "Mercury", radius: 0.7, distance: 16, speed: 0.03,   tex: createProceduralTexture('craters', '#888888', '#555555'), tilt: 0.03 },
+            { name: "Venus",   radius: 1.4, distance: 24, speed: 0.02,   tex: createProceduralTexture('bands', '#e3bb76', '#b58a4c'),   tilt: 2.64 },
+            { name: "Earth",   radius: 1.5, distance: 34, speed: 0.012,  tex: createProceduralTexture('earth', '#1155ff', '#22aa33'),   tilt: 23.44 },
+            { name: "Mars",    radius: 0.9, distance: 44, speed: 0.009,  tex: createProceduralTexture('craters', '#cc4400', '#882200'), tilt: 25.19 },
+            { name: "Jupiter", radius: 3.8, distance: 58, speed: 0.004,  tex: createProceduralTexture('bands', '#d4a373', '#a67c52'),   tilt: 3.13 },
+            { name: "Saturn",  radius: 3.2, distance: 76, speed: 0.002,  tex: createProceduralTexture('bands', '#f4e2bb', '#c2b280'),   tilt: 26.73, hasRings: true },
+            { name: "Uranus",  radius: 2.2, distance: 92, speed: 0.0008, tex: createProceduralTexture('bands', '#70d6ff', '#4ea8de'),   tilt: 97.77 },
+            { name: "Neptune", radius: 2.1, distance: 106,speed: 0.0004, tex: createProceduralTexture('bands', '#3a86ff', '#004ee9'),   tilt: 28.32 }
+        ];
+
+        const planetMeshes = [];
+
+        // --- 6. Generation Loop Matrix Engine ---
+        planetData.forEach((data) => {
+            // Draw clean, visible mathematical circular lines mapping out each orbit path boundary
+            const orbitPoints = [];
+            for (let i = 0; i <= 128; i++) {
+                const theta = (i / 128) * Math.PI * 2;
+                orbitPoints.push(new THREE.Vector3(Math.cos(theta) * data.distance, 0, Math.sin(theta) * data.distance));
+            }
+            const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPoints);
+            const orbitMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 });
+            const orbitLine = new THREE.Line(orbitGeo, orbitMat);
+            scene.add(orbitLine);
+
+            // Isolate individual axial tilt rotations inside an absolute parent pivot container group
+            const axialGroup = new THREE.Group();
+            axialGroup.rotation.z = THREE.MathUtils.degToRad(data.tilt);
+            scene.add(axialGroup);
+
+            // Create standard light-reactive sphere shapes for each planet
+            const geometry = new THREE.SphereGeometry(data.radius, 64, 64);
+            const material = new THREE.MeshStandardMaterial({ 
+                map: data.tex,
+                roughness: 0.7,
+                metalness: 0.1
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            axialGroup.add(mesh);
+
+            // Handle Saturn's ring system plane vector mappings
+            if (data.hasRings) {
+                const ringGeo = new THREE.RingGeometry(data.radius + 1, data.radius + 4, 64);
+                const ringMat = new THREE.MeshStandardMaterial({ 
+                    color: 0xa6956d, 
+                    side: THREE.DoubleSide, 
+                    transparent: true, 
+                    opacity: 0.7 
+                });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.rotation.x = Math.PI / 2; // Flip ring to sit flat on orbit plane
+                mesh.add(ringMesh);
+            }
+
+            // Save references for engine runtime loops
+            planetMeshes.push({
+                pivotGroup: axialGroup,
+                bodyMesh: mesh,
+                distance: data.distance,
+                speed: data.speed,
+                angle: Math.random() * Math.PI * 2
+            });
+        });
+
+        // --- 7. Cosmic Starfield Background ---
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 2000;
+        const starPositions = new Float32Array(starCount * 3);
+
+        for(let i = 0; i < starCount * 3; i++) {
+            starPositions[i] = (Math.random() - 0.5) * 500;
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starMat = new THREE.PointsMaterial({ size: 0.4, color: 0xffffff });
+        const stars = new THREE.Points(starGeo, starMat);
+        scene.add(stars);
+
+        // --- 8. Core Frame Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Slow localized rotation loop for the Sun mesh
+            sun.rotation.y += 0.002;
+
+            // Recalculate positions frame-by-frame along circular orbit paths using trigonometry
+            planetMeshes.forEach((planet) => {
+                planet.angle += planet.speed * 0.4;
+                
+                planet.pivotGroup.position.x = Math.cos(planet.angle) * planet.distance;
+                planet.pivotGroup.position.z = Math.sin(planet.angle) * planet.distance;
+                
+                // Spin individual child planet body spheres along their tilted axes
+                planet.bodyMesh.rotation.y += 0.015;
+            });
+
+            controls.update(); // Update mouse dragging physics
+            renderer.render(scene, camera); // Render frame changes to the canvas element
+        }
+
+        animate();
+
+        // --- 9. Screen Adjustment Resizing Logic ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
