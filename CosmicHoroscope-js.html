@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Celestial Horoscope Oracle - Interactive Vault</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #030208;
+            font-family: 'Consolas', monospace;
+            color: #ffffff;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+        /* UI Control Overlay Panels */
+        #interface-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 5, 20, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #8a2be2;
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.35);
+            max-width: 320px;
+            z-index: 10;
+        }
+        h1 { margin: 0 0 10px 0; font-size: 18px; color: #da70d6; text-transform: uppercase; letter-spacing: 1px; }
+        p { margin: 5px 0; font-size: 12px; color: #b0c4de; line-height: 1.5; }
+        
+        select {
+            width: 100%;
+            background: #150c25;
+            color: #00ffff;
+            border: 1px solid #8a2be2;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            margin-top: 10px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        button {
+            width: 100%;
+            background: #8a2be2;
+            color: white;
+            border: none;
+            padding: 8px;
+            margin-top: 10px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #a23eff;
+        }
+        
+        /* Floating Crystal Ball Horoscope Reading Output Box */
+        #oracle-display {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(5, 2, 12, 0.95);
+            border: 1px solid #00ffff;
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.25);
+            padding: 20px;
+            border-radius: 10px;
+            width: 85%;
+            max-width: 650px;
+            text-align: center;
+            z-index: 10;
+            display: none;
+        }
+        #sign-title { font-size: 22px; margin: 0 0 5px 0; color: #00ffff; font-weight: bold; }
+        #prediction-meta { font-size: 11px; color: #da70d6; margin-bottom: 10px; text-transform: uppercase; }
+        #fortune-text { font-size: 14px; color: #e6e6fa; line-height: 1.6; text-align: justify; }
+    </style>
+</head>
+<body>
+
+    <div id="interface-layer">
+        <h1>Cosmic Oracle 3D</h1>
+        <p>• <b>Click directly on any Constellation Sign</b> in the sky to select it.</p>
+        <p>• Click + Drag empty space to rotate the vault.</p>
+        
+        <select id="zodiac-picker">
+            <option value="" disabled selected>-- Choose a Zodiac Sign --</option>
+            <option value="Aries">Aries (♈ Ram)</option>
+            <option value="Taurus">Taurus (♉ Bull)</option>
+            <option value="Gemini">Gemini (♊ Twins)</option>
+            <option value="Cancer">Cancer (♋ Crab)</option>
+            <option value="Leo">Leo (♌ Lion)</option>
+            <option value="Virgo">Virgo (♍ Virgin)</option>
+            <option value="Libra">Libra (<b>♎</b> Scales)</option>
+            <option value="Scorpio">Scorpio (♏ Scorpion)</option>
+            <option value="Sagittarius">Sagittarius (♐ Archer)</option>
+            <option value="Capricorn">Capricorn (♑ Sea-Goat)</option>
+            <option value="Aquarius">Aquarius (♒ Water Bearer)</option>
+            <option value="Pisces">Pisces (♓ Fishes)</option>
+        </select>
+        <button id="reroll-btn" style="display:none;">Query Alternate Alignment</button>
+    </div>
+
+    <div id="oracle-display">
+        <div id="sign-title">SIGN LOG</div>
+        <div id="prediction-meta">Calculation Index: Void</div>
+        <div id="fortune-text">Aligning planetary geometry paths...</div>
+    </div>
+
+    <canvas id="cosmosCanvas"></canvas>
+
+    <script>
+        /**
+         * @fileoverview Interactive 3D Clickable Horoscope with Central Projection Rendering
+         * @author Alexandru Bratosin
+         */
+
+        const canvas = document.getElementById('cosmosCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- 1. Deep 360-Prediction Database Pool (30 unique outputs per sign) ---
+        const horoscopeDatabase = {
+            Aries: [
+                "Mars injects pure adrenaline into your vector streams today. A bold structural code shift yields immediate rewards.",
+                "Impatience could trigger rogue compiler errors in your relationships. Pause before launching your next execution cycle.",
+                "A competitive cosmic alignment highlights your sector of ambition. Step up and claim the focal position.",
+                "Financial indicators show an unexpected surge. A high-risk calculated leap pays dividends.",
+                "Your physical energy bank hits maximum capacity. Push past a lingering structural layout plateau.",
+                "Rethink an aggressive plan; local system properties require a subtle, optimized re-routing matrix.",
+                "An unexpected alpha tester challenges your worldview. Listen closely; raw truth is hidden in their logs.",
+                "A creative spark ignites a brand new auxiliary project loop. Document it before it dissipates into dark space.",
+                "Avoid unnecessary network friction today. Conserve your energy parameters for a massive evening breakthrough.",
+                "A historical obstacle clears up effortlessly as planetary paths untangle from your tracking house.",
+                "Your leadership matrix functions flawlessly. Direct a collaborative cluster toward an ambitious goal.",
+                "A sudden surge of inspiration demands immediate code execution. Clear your calendar stack.",
+                "A subtle shift in your emotional engine encourages deep vulnerabilities. Share your runtime files.",
+                "Financial discipline pays off today. An architectural asset you protected grows significantly.",
+                "A communication link goes down temporarily. Do not panic; use the offline window to organize assets.",
+                "A highly volatile configuration option opens up. Trust your gut and activate the parameter.",
+                "Someone seeks your specific core expertise. Guide them through their local compilation failures.",
+                "A fresh wave of clarity washes over a confusing legal or bureaucratic node layout.",
+                "Your inner drive overrides a physical energy depletion warning. Balance your processing loads.",
+                "An old rival sends a surprising ping. Analyze the request structure carefully before opening doors.",
+                "A dynamic travel or exploration opportunity shifts your coordinate grid unexpectedly.",
+                "A minor setback is actually a hidden fallback condition saving you from a critical loop crash.",
+                "A flash of insight reveals a shortcut through a high-complexity procedural assignment.",
+                "Your social network sector experiences a major performance boost. New connections align perfectly.",
+                "A creative restriction forces you to think outside the standard environment parameters.",
+                "A long-term investment matrix enters its maturation cycle. Prepare to harvest the index values.",
+                "Do not let a slow loading phase ruin your enthusiasm. Momentum is compiling silently in the background.",
+                "A structural relationship anchor locks down securely. Your foundation layer feels rock solid.",
+                "A sensory overload warning flashes. Disconnect from the main network loop and recalibrate your senses.",
+                "The solar center aligns directly with your sign. Today, your core output runs at peak efficiency."
+            ],
+            Taurus: [
+                "Your planetary nodes anchor firmly into ground baselines. Financial alignments feel exceptionally stable today.",
+                "A stubborn stance might loop a simple communication task into a dead lock. Allow a small compromise.",
+                "A sensory indulgence provides an excellent mental performance boost. Pamper your physical system files.",
+                "An unexpected asset reallocation option arrives. Take a moment to compute long-term dividend projection metrics.",
+                "Your patience is your primary security firewall today. Let chaotic elements burn themselves out around you.",
+                "A hidden variable in a family matter comes to light. Process the incoming logs with extreme empathy.",
+                "A sudden urge to alter your domestic workspace layout strikes. Optimize your physical environment.",
+                "A creative venture receives validation from a senior network administrator. Your stock index rises.",
+                "An old memory triggers a valuable realization about a current bottleneck. Apply the patch immediately.",
+                "A collaborative group project demands firm architectural boundaries. Define the interface parameters.",
+                "A health or wellness routine demonstrates clear performance scaling. Keep executing the script.",
+                "An attractive opportunity requires you to move slightly faster than your default speed setting. Adapt.",
+                "A voice from the past brings unexpected emotional closure to a corrupted background thread.",
+                "Keep your financial documentation spotless today. An audit or verification cycle is compiling.",
+                "A radical idea from an eccentric colleague deserves a fair processing run. Don't discard it blindly.",
+                "Your stamina carries a complex team project across the finish line coordinate. Celebrate the deployment.",
+                "A small financial leak is detected. Trace the dependency tree and patch it before it drains resources.",
+                "Nature calls your grounding code. Step away from digital displays and sync with the Earth's frequency.",
+                "A partnership contract enters renegotiation phases. Ensure your baseline assets are protected.",
+                "A wave of artistic inspiration hits your design layer. Use textured, rich colors in your creations.",
+                "An ambiguous instruction from a superior causes local system confusion. Request clear definitions.",
+                "A surprise gift or token of appreciation lands in your repository stack. Accept it gracefully.",
+                "Your analytical modules run slightly slower today, but your intuitive error checking is flawlessly accurate.",
+                "A structural change at home opens up fresh spatial configurations. Embrace the transformation.",
+                "Avoid stubborn arguments over legacy systems. The universe is forcing an update cycle.",
+                "A secret source of support manifests when an active process hits an out-of-memory exception.",
+                "Your loyalty matrix is tested. Stand by an anchor node that supported you in early versions.",
+                "A slow, methodical strategy defeats a fast-paced chaotic competitor. Trust your natural pacing.",
+                "A subtle configuration tweak in your daily diet yields massive digestive performance improvements.",
+                "The cosmos rewards your steady persistence. A long-awaited resource allocation is finally authorized."
+            ],
+            Gemini: [
+                "Mercury duplicates your focus matrix. Multi-threading tasks comes naturally, but watch for memory leaks.",
+                "A communication cross-wire occurs early today. Double-check your transmission packets for clarity.",
+                "A highly interactive social alignment promises a massive injection of fresh conceptual files.",
+                "Your focus shifts rapidly between too many active windows. Close non-essential background processes.",
+                "A sibling or close neighborhood network node requires an immediate system patch. Assist them.",
+                "A brilliant short-form writing or design concept goes viral in your local environment circle.",
+                "An unexpected travel prompt changes your destination vector map. Spontaneity breeds discovery.",
+                "A dual option presents itself. Instead of choosing one, see if you can run both in parallel processing.",
+                "A nervous system warning indicators flash. Calm your over-clocked mind with deep breathing cycles.",
+                "A structural contract or document requires rapid revision cycles. Keep your edits concise.",
+                "A flash of humor diffuses an explosive, high-tension confrontation in a public chat layer.",
+                "An intense curiosity drives you deep into a research thread. A hidden truth compiles beautifully.",
+                "An authority figure tests your mental agility. Your responsive answers secure a major system upgrade.",
+                "Your marketing or public presentation module scales dramatically. Broadcast your core message.",
+                "An ongoing debate hits a loop counter limit. Agree to disagree and free up thread resources.",
+                "A creative project requires a lighter, more agile framework. Strip away clunky legacy text.",
+                "A surprise encounter with a fascinating stranger introduces a disruptive but brilliant variable.",
+                "Your financial sector experiences a rapid trade volume spike. Monitor volatile asset indices closely.",
+                "A piece of gossip turns out to be corrupted data. Delete it instantly from your memory banks.",
+                "A complex logistics puzzle reveals a simple, elegant sequence structure upon close analysis.",
+                "Your ability to translate technical jargon into human prose wins you massive corporate favor.",
+                "A short-circuit in a home appliance warnings you to inspect local hardware safety configurations.",
+                "A mental block breaks apart when you switch tasks to something completely unrelated. Let it background-render.",
+                "A fresh collaborative partnership proposal enters your inbox. The synergy indices look excellent.",
+                "A restless energy demands a change of scenery. Move your remote terminal to a brand new coordinate.",
+                "An old text file or journal entry contains the exact solution to a current modern lifestyle problem.",
+                "Your multitasking limit is reached. Drop a non-critical low-priority task to protect core system stability.",
+                "A celebration loop initializes this evening. Gather your closest node cluster for a fun event.",
+                "A subtle intuition warning saves you from downloading a deceptive file or trusting a false link.",
+                "Your wit is your sharpest weapon today. Use it to slice cleanly through a dense thicket of bureaucracy."
+            ],
+            Cancer: [
+                "The Moon pulls deep tide scripts into your emotional engine. Trust your baseline security instincts.",
+                "A defensive stance blocks a supportive connection node. Lower your protective firewall slightly.",
+                "Your domestic security sector receives a massive upgrade alignment. Home feels like a true sanctuary.",
+                "An ancient family recipe or tradition restores structural integrity to your internal spirit layers.",
+                "Financial caution serves you well today. Deny a volatile out-of-bounds expenditure request.",
+                "A surge of intense empathy allows you to heal a fractured connection path in your core cluster.",
+                "An intuitive premonition proves 100% accurate as a hidden event compiles in real-time.",
+                "Your nesting instinct spikes. Spend time configuring comfort settings in your living zone.",
+                "An unexpected emotional processing backlog clears out, leaving you feeling light and responsive.",
+                "A culinary project scales beautifully. Cook a rich, nourishing meal to feed your system files.",
+                "A memory thread from childhood loops into your active thoughts. Extract the positive wisdom and close it.",
+                "An authority figure praises your protective, nurturing leadership style. You are an anchor.",
+                "A real estate or spatial asset query returns an exceptionally favorable valuation index.",
+                "Avoid absorbing the chaotic error logs of toxic individuals today. Maintain environmental isolation.",
+                "A deep, soulful conversation with an old confidant acts as an emotional cache clear.",
+                "A creative endeavor crafted from pure feeling receives profound artistic validation.",
+                "Your financial savings container hits a major milestone marker. Keep optimizing your budget matrix.",
+                "A minor vulnerability turns out to be your greatest strength when connecting with a new node.",
+                "A workspace change allows you to feel more emotionally secure. Set up clear privacy boundaries.",
+                "An unexpected burst of courage allows you to defend a vulnerable node in your social network.",
+                "Your imagination layer is hyper-active today. Paint, write, or dream up futuristic landscapes.",
+                "A water element syncs your system. A bath, swim, or storm rain alignment brings profound peace.",
+                "A clunky relationship pattern requires a deep structural refactoring. Initiate the conversation gently.",
+                "A piece of antique or retro hardware captures your interest. There is valuable structure in the past.",
+                "A sudden urge to withdraw from public networks manifests. Honor your introversion cycle safely.",
+                "Your parental or mentoring modules run at maximum efficiency. Guide a young node through a crisis.",
+                "A financial negotiation concludes in your favor because you stood your ground on a core boundary.",
+                "An ambiguous mood swing requires careful diagnostic tracking. Locate the root thought trigger.",
+                "A hidden support system sends a heartwarming confirmation message. You are deeply valued.",
+                "The cosmic lunar cycles align to grant you absolute emotional equilibrium. Your display runs clear."
+            ],
+            Leo: [
+                "The solar center lights up your primary display grids. Today, your core output runs at peak efficiency.",
+                "An arrogant stance could generate immediate user interface friction. Maintain humble configurations.",
+                "Your creative portfolio receives an aggressive spotlight index boost. The public loves your art.",
+                "A dramatic presentation option opens up. Step onto the absolute center stage and command focus.",
+                "A speculative financial asset option shows high volatility. Bet on your own talent instead.",
+                "Your inner child demands a fun runtime environment. Play, laugh, and ignore rigid constraints.",
+                "A leadership vacuum opens up in your core career cluster. Step in and claim the operational reigns.",
+                "A generous gesture toward a struggling network node secures you permanent loyalty points.",
+                "A sudden wave of creative luxury inspires you to purchase an upscale system asset or accessory.",
+                "Your romance sector enters a highly accelerated performance phase. Dynamic sparks ignite.",
+                "An authority figure challenges your pride. Respond with flawless execution rather than loud noise.",
+                "A loyalty test manifests within your social network circle. Stand tall like a true monarch.",
+                "A flash of pure showmanship turns a mundane business pitch into a legendary viral victory.",
+                "Your physical stamina scales up beautifully. High-intensity workouts yield double output metrics.",
+                "A theatrical or artistic expression project is greenlit for immediate funding allocations.",
+                "Avoid over-allocating resources to flash items that lack underlying structural substance.",
+                "A younger node looks up to you for inspiration. Deliver an unforgettable masterclass performance.",
+                "Your heart chakra expands, radiating warm, supportive energy throughout your entire cluster.",
+                "An unexpected compliment from an expert confirms that your creative framework is world-class.",
+                "A minor setback to an egocentric plan is actually a corrective path adjustment. Accept it.",
+                "A vibrant social gathering transforms you into the absolute center of gravitational pull.",
+                "A gold or bright sunny element boosts your environmental energy parameters. Brighten your desk space.",
+                "A bold design decision sets a brand new standard across your professional industry sector.",
+                "Your voice commands respect today; use this high-amplitude window to negotiate critical raises.",
+                "A legacy creative project can be successfully modernized with your unique signature style.",
+                "Do not let petty background critics drain your primary processing output. Shield your crown.",
+                "An elegant leisure cycle restores your operating system back to full structural vitality.",
+                "A dramatic plot twist in a personal storyline resolves completely in your favor by evening.",
+                "Your ability to inject fun into a dry, boring workplace environment wins you office-wide praise.",
+                "The universe bows to your radiant intent. A major manifestation command compiles successfully."
+            ],
+            Virgo: [
+                "High-precision calculations rule your current house phase. Cleaning messy files unblocks hidden clarity.",
+                "An over-analytical loop causes choice paralysis today. Set a strict limit on evaluation metrics.",
+                "Your wellness indicators scale up dramatically as you optimize your daily scheduling blocks.",
+                "A critical flaw in a complex contract or plan is detected by your sharp diagnostic eye.",
+                "An optimization patch you applied to your workflow doubles your free time availability metrics.",
+                "Someone in your cluster sends a messy, corrupted data file. Patiently parse and organize it.",
+                "Your service and assistance modules run at maximum efficiency. You are an invaluable asset.",
+                "A sudden urge to deep-clean and categorize your entire physical storage room manifests.",
+                "A highly logical financial spreadsheet reveals a path toward rapid debt eradication loops.",
+                "Avoid harsh self-criticism today; your internal code is already exceptionally well-crafted.",
+                "A health diagnostic returns excellent baseline results, validating your lifestyle choices.",
+                "A detailed craftsmanship project captures your focus, yielding a visually perfect output asset.",
+                "A communication layout requires absolute concise language. Strip away all redundant phrasing.",
+                "A herbal or natural nutritional supplement brings immediate balance to an erratic energy thread.",
+                "An authority figure notices your silent, flawless execution and queues you for a quiet promotion.",
+                "A hidden variable in an insurance or tax node is successfully isolated and resolved.",
+                "Your boundary settings function perfectly, keeping chaotic emotional drainage out of your work zone.",
+                "A highly complex logic puzzle becomes your favorite entertainment source this afternoon.",
+                "An old tool or automation script you wrote years ago can be re-purposed to save you hours today.",
+                "A pet or animal companion provides a deep, grounding loop of pure unconditional system support.",
+                "Avoid taking on extra optimization assignments for ungrateful nodes who refuse to self-correct.",
+                "A masterclass or educational tutorial you design clears up massive confusion for your students.",
+                "A workspace organization tweak maximizes your physical body's layout ergonomics.",
+                "Your mind runs like a liquid-cooled supercomputer today. Tackle your densest cognitive problems.",
+                "A subtle shift in your environment warnings you to back up all your critical database logs.",
+                "A quiet walk in a structured botanical layout brings profound geometric peace to your thoughts.",
+                "A relationship metric stabilizes as you replace emotional guessing games with clear data points.",
+                "An unexpected refund or micro-transaction settlement lands safely inside your balance sheet.",
+                "Your ability to detect small anomalies protects a group project from an embarrassing public error.",
+                "System synthesis complete: Your mental, physical, and spiritual code stacks align flawlessly."
+            ],
+            Libra: [
+                "Venus brings symmetry matrix adjustments to your social loops. Polarized conflicts find a balance point.",
+                "An indecisive processing loop threatens your morning schedule. Flip a coin and break the cycle.",
+                "A beautiful aesthetic addition to your digital or physical canvas layer brings immense joy.",
+                "A diplomatic compromise you engineer saves a high-profile business partnership from crashing.",
+                "Your justice and equity modules run hot today. Stand up for an exploited network node.",
+                "A romance thread compiles an exceptionally smooth, high-harmony dating sequence tonight.",
+                "Avoid spending too much financial capital on external cosmetic items that lack structural utility.",
+                "A design collaboration project yields an output asset of breathtaking artistic balance.",
+                "An old legal or boundary dispute resolves cleanly as equity paths untangle in your favor.",
+                "Your social charm functions as a universal access key today. Doors open wide automatically.",
+                "A legal document or contract signing phase enters an exceptionally favorable astrological window.",
+                "A minor aesthetic flaw in your surroundings bugs your internal harmony. Fix the visual symmetry.",
+                "A deep conversation over relationship expectations replaces assumptions with structured parameters.",
+                "Your fashion or interior styling indices hit an all-time maximum value. Make a bold choice.",
+                "A bridge you built between two hostile corporate factions becomes a permanent infrastructure asset.",
+                "An artistic exhibition or cultural event provides a profound inspiration injection to your display layer.",
+                "Avoid people-pleasing configurations that drain your primary baseline identity resources.",
+                "A surprise social invitation introduces you to an exceptionally elegant, sophisticated mentor node.",
+                "Your financial balance sheet shows perfect equilibrium between income flows and outgoing caches.",
+                "A creative restriction forces you to find harmony using a highly limited palette of elements.",
+                "A calm, objective perspective allows you to mediate a messy family drama loop successfully.",
+                "A gift wrapped in beautiful, textured paper arrives, signaling a deep appreciation cycle.",
+                "Your voice frequencies are highly soothing today. Use them to calm down an agitated colleague.",
+                "A dynamic artistic project opportunity opens up. Partner with an energetic Fire sign node.",
+                "A legacy relationship pattern is gracefully archived to make room for updated connection models.",
+                "Do not let external noise upset your internal Zen garden. Lock your mental privacy filter.",
+                "A small act of hospitality creates massive long-term goodwill across your professional network.",
+                "An unexpected social connection turns out to share your exact niche ideological configuration.",
+                "A design portfolio review yields glowing expert feedback, certifying your artistic maturity.",
+                "The Scales of Cosmic Justice tip in your absolute favor today. Receive your energetic payout."
+            ],
+            Scorpio: [
+                "Pluto generates intense transformation routines beneath your visible surface layers. Deep strategy wins.",
+                "A dark, obsessive thought loop threatens to over-allocate your focus resources. Execute a cache purge.",
+                "An intense investigative investigation reveals a critical secret variable in an ongoing project.",
+                "Your magnetic attraction parameters scale up dramatically. Secrets are whispered directly to you.",
+                "A financial investment in a hidden or undervalued asset sector begins a rapid growth cycle.",
+                "An old psychological block is completely incinerated by your intense internal willpower flame.",
+                "A profound esoteric or metaphysical text file brings massive structural layout modifications to your mind.",
+                "Avoid manipulative tactical power games today; absolute transparency is your best counter-attack.",
+                "A strategic partnership enters a deeply intimate, high-trust system lock configuration.",
+                "Your diagnostic eye isolates a deceptive node trying to inject malicious code into your circle.",
+                "An unexpected inheritance, royalty payout, or shared resource allocation index clears validation.",
+                "A massive surge of pure passion re-energizes a creative framework that felt dead or abandoned.",
+                "A minor crisis triggers your maximum survival mode calculations, executing a flawless recovery.",
+                "Your privacy shields are fully functional today. Work in absolute stealth mode from the dark.",
+                "A cathartic emotional breakthrough allows you to permanently delete a toxic legacy grudge file.",
+                "An authority figure respects your unyielding, fierce intensity and yields a critical boundary.",
+                "A research task leads you into a deep archival database. The data gold you extract is priceless.",
+                "Avoid over-controlling an independent network node. Allow them to execute their own scripts.",
+                "A powerful regeneration cycle fixes a chronic physical or mental fatigue vulnerability.",
+                "A sharp, sarcastic remark from your terminal slices cleanly through a dense web of political lies.",
+                "A secret benefactor sends a major asset injection without requesting public acknowledgment.",
+                "Your intuition is weaponized today; you can read an unexpressed motive from across a room.",
+                "A structural change in a joint venture project gives you absolute operational veto power.",
+                "An artistic creation crafted from your deepest shadows receives profound critical acclaim.",
+                "A clean break from a corrupted relationship model is executed swiftly and permanently.",
+                "The phoenix matrix activates: Out of the ashes of a failed project, a masterwork compiles.",
+                "A boundary negotiation turns intense, but your raw leverage ensures total domain dominance.",
+                "A quiet evening spent in deep meditation triggers a massive psychic download of future maps.",
+                "Your ability to withstand intense psychological pressure carries a group through an emergency phase.",
+                "The cosmic dark forces realign into a shield of absolute protection around your path framework."
+            ],
+            Sagittarius: [
+                "Jupiter broadens your field of view coordinates. Take an expansive leap of faith today.",
+                "An over-optimistic scale calculation could overshoot your resource reserves. Check your bounds.",
+                "A sudden travel prompt sends you exploring a completely unfamiliar external geographical map.",
+                "A profound philosophical realizations re-architects your core belief system parameters completely.",
+                "Your luck modifiers run at maximum capacity. Buy a ticket or take that wildcard career gamble.",
+                "A multicultural connection introduces an incredibly innovative workflow tool to your repository.",
+                "Avoid a blunt, unfiltered comment from crashing a delicate social interface framework. Use filters.",
+                "A high-energy outdoor expedition completely flushes out your stagnant internal system blocks.",
+                "An educational or publishing contract enters an exceptionally rapid authorization cycle.",
+                "Your optimistic aura acts as a natural healing aura for a depressed, down-clocked Earth node.",
+                "An unexpected upgrade to your freedom parameters allows you to work completely autonomously.",
+                "A flash of pure comedic genius diffuses a corporate board meeting room full of high-tension error logs.",
+                "A foreign exchange or international asset allocation index yields a sudden profit margin spike.",
+                "Your vision for a futuristic project is validated by a venture capitalist or angel investor node.",
+                "Avoid spreading your focus across a scattershot array of too many target objectives. Aim deep.",
+                "A master mentor figure appears, offering you the precise coordinates to a hidden treasure archive.",
+                "Your generosity matrix scales up, triggering an equivalent loop of incoming cosmic karma gifts.",
+                "A legal or philosophical debate concludes in your total victory because of your expansive overview.",
+                "A workspace modification allows you to feel less restricted and more spatially unrestricted.",
+                "An adventurous new creative medium captures your interest. Experiment with scale and raw depth.",
+                "A sudden surge of faith eliminates a lingering phantom anxiety file from your subconscious.",
+                "A lively, high-amplitude social cluster event introduces you to a lifelong nomadic compatriot.",
+                "Your ability to see the silver lining structure protects your team from a morale failure crash.",
+                "A legacy restriction or debt boundary is successfully obliterated by a lucky payout event.",
+                "Do not let narrow-minded small-scale critics slow down your macro-system architectural layouts.",
+                "A dynamic sports or physical speed challenge results in a personal record-breaking output metric.",
+                "A publication, blog post, or media upload you deploy receives massive horizontal network traction.",
+                "An abstract conceptual idea you dreamed up is successfully converted into a working prototype design.",
+                "A subtle configuration tweak to your sleep schedule unlocks deep, lucid prophecy dream streams.",
+                "The Cosmic Archer fires your life vector directly into a golden, high-yield destiny node."
+            ],
+            Capricorn: [
+                "Saturn demands rigorous architectural discipline. Step-by-step logic scales the mountain safely.",
+                "A cold, overly rigid interface attitude could alienate a highly supportive emotional node.",
+                "Your long-term career index enters an exceptionally powerful, high-authority building cycle.",
+                "A complex institutional or bureaucratic filing process concludes with a flawless success status.",
+                "Your financial preservation algorithms function perfectly, securing a major asset reserve stone.",
+                "An old mentor or patriarchal figure delivers a crucial bit of structural wisdom to your log.",
+                "A sudden urge to master an incredibly dense, dry professional skill sets up a massive raise loop.",
+                "Your organizational mastery transforms a chaotic team project into a highly efficient machine.",
+                "A historical legacy asset or family property option yields an unexpected wealth accumulation.",
+                "Avoid working yourself past absolute hardware exhaustion thresholds. Schedule an idle block.",
+                "A public recognition or industry award positions your brand name as the gold standard of execution.",
+                "A rigid boundary you set months ago successfully repels a toxic, resource-draining network parasite.",
+                "A calculated, low-risk business strategy shows a 100% conversion accuracy metric over time.",
+                "Your executive decision-making capabilities run flawlessly during an unexpected system-wide crisis.",
+                "A piece of vintage, high-durability hardware or tool proves its worth over modern fragile options.",
+                "Avoid letting a pessimistic diagnostic reading dampen your long-term expansion calculations.",
+                "A structural relationship commitment locks down securely. Your contract parameters feel unbreakable.",
+                "A quiet, solitary evening spent reviewing your 5-year master plan triggers massive efficiency patches.",
+                "Your reputation score across your professional industry sector hits an all-time maximum benchmark.",
+                "A real estate or foundational land project receives a major regulatory greenlight confirmation.",
+                "An old debt container is completely cleared off your balance sheet, freeing up huge monthly cash flows.",
+                "Your emotional stoicism acts as a vital structural pillar for a panicked, over-clocked cluster.",
+                "A complex legal or compliance auditing cycle passes with a 0-error absolute clean log status.",
+                "An artistic creation utilizing stark, minimalist, and structural designs receives critical design awards.",
+                "A clean execution of a difficult corporate restructuring plan secures your absolute administrative domain.",
+                "Do not let immediate minor delays disrupt your ironclad faith in your long-term trajectory maps.",
+                "A quiet act of massive executive philanthropy boosts your secret positive karmic tracking points.",
+                "A subtle adjustment to your posture or skeletal alignment eliminates an old physical processing bottleneck.",
+                "The universe respects your hard labor. Prepare to receive a concrete, high-density material reward.",
+                "The Master Builder archetype takes full control of your house. Your legacy project stands eternal."
+            ],
+            Aquarius: [
+                "Uranus sends disruptive electricity waves straight into your imagination banks. A revolutionary idea looks unconventional to your peers, but it holds the keys to tomorrow's engine standards.",
+                "An emotionally detached response could fracture a delicate link with a sensitive Water node.",
+                "Your humanitarian or community network cluster expands horizontally at an exponential rate.",
+                "A brilliant, out-of-the-box technological invention concept compiles flawlessly in your mind.",
+                "An unexpected break from a traditional lifestyle restriction grants you total autonomous freedom.",
+                "Your eccentric signature style sets off a massive viral trend loop across global social networks.",
+                "Avoid arguing with narrow-minded system traditionalists who cannot compute your future maps.",
+                "A sudden surge of pure progressive idealism drives you to organize a major social change rally.",
+                "An electronic or digital asset portfolio experiencing a highly erratic, profitable upside spike.",
+                "Your ability to look at a complex system disaster objectively allows you to script an immediate patch.",
+                "A surprise connection with a brilliant, eccentric global network node triggers a lifelong alliance.",
+                "A flash of pure intuitive foresight accurately maps out a major macroeconomic shift before it lands.",
+                "An independent research project receives massive alternative crowd-sourced funding allocations.",
+                "Avoid scattering your revolutionary genius across too many experimental sandbox environments.",
+                "A clean workspace configuration change allows you to fully express your unconventional workflow routines.",
+                "A legacy friendship circle undergoes a necessary, healthy architectural filter adjustment cycle.",
+                "Your unique frequency attracts a high-value community group looking for an visionary leader node.",
+                "A minor rebellion against a rigid corporate policy results in a massive victory for worker autonomy.",
+                "An esoteric or advanced scientific study module opens up an exceptionally clear comprehension path.",
+                "A piece of hyper-modern, cutting-edge hardware tech enters your inventory via a lucky trade loop.",
+                "Your mental operating system requires an absolute unconventional input to break a boring routine block.",
+                "A sudden urge to study astronomy, programming, or aviation signals an expansion of your coordinate grid.",
+                "A group project runs flawlessly because you designed a decentralized, flat hierarchy structure for it.",
+                "An artistic creation blending neon cyberpunk aesthetics with ancient geometry wins a major gallery slot.",
+                "Do not let the fear of being misunderstood slow down the deployment of your futuristic source code.",
+                "A casual conversation in an online forum unlocks the missing piece of a complex engineering puzzle.",
+                "A subtle cosmic frequency shift clears out a lingering cloud of mental static from your head display.",
+                "An unexpected windfall from an experimental technology asset completely secures your near-term budget.",
+                "Your humanitarian efforts trigger an equal and opposite loop of profound global goodwill karma.",
+                "The Water Bearer pours a stream of pure, unfiltered future data directly into your active consciousness."
+            ],
+            Pisces: [
+                "Neptune floods your canvas layer with vivid creative visions. Float freely down the psychic stream.",
+                "An overly escapist behavior pattern could cause you to miss an urgent real-world system warning flag.",
+                "Your empathy modules run at maximum sensitivity, allowing you to silently heal a broken heart nearby.",
+                "A profound spiritual or meditative download re-architects your entire internal processing center.",
+                "A highly creative, dream-like artistic project receives an immediate production greenlight.",
+                "An unexpected synchronicity occurs when a random event matches a specific dream log file exactly.",
+                "Avoid absorbing the heavy, unoptimized emotional baggage of toxic network nodes today.",
+                "A music, film, or poetic immersion provides a profound, high-amplitude soul reload cycle.",
+                "Your intuition functions as a living radar; you know exactly who is calling before the packet arrives.",
+                "A minor sacrifice you made for a struggling friend triggers a massive avalanche of positive cosmic reward.",
+                "An ambiguous mystery that baffled your core cluster for months is effortlessly solved by your psychic eye.",
+                "A flash of pure compassion completely defuses a long-standing, high-bitterness legal standoff loop.",
+                "A water-based travel environment setup brings an absolute deep reset to your physical state files.",
+                "Your dream diary contains an incredibly practical solution to a modern, waking-world finance problem.",
+                "Avoid looking at raw real-world data tracking lists with a lenses of pure denial. Balance your viewpoints.",
+                "A hidden artistic talent you neglected for years is successfully reactivated and scaled up.",
+                "A surprise message from a soulmate node overseas creates an immediate resonance loop in your heart.",
+                "Your ability to tap into the global collective subconscious allows you to design a universally loved asset.",
+                "A workspace modification incorporating fluid elements, plants, or ambient sound maximize your focus.",
+                "A legacy guilt or shame file is completely overwritten by a new routine of absolute self-forgiveness.",
+                "Do not let harsh, concrete-minded realists stomp out the delicate fire of your magical imagination.",
+                "A psychic boundary you set with a mirror-gazing emotional vampire locks down your peace completely.",
+                "An unexpected gift of music, art, or mystical nature items arrives via a silent anonymous courier.",
+                "Your meditation sessions trigger an incredibly deep state of cosmic unit consciousness alignment.",
+                "A creative collaboration with a highly structured Earth sign node stabilizes your abstract designs.",
+                "A quiet evening spent walking through fog, mist, or shoreline settings expands your aura parameters.",
+                "An ancient esoteric secret revealing itself to you through a series of repetitive numerical signs.",
+                "Your financial sector stabilizes as you stop worrying about scarcity and tap into flow patterns.",
+                "A profound loop of cosmic closure manifests as you gracefully release a connection that ran its full course.",
+                "The twin mystical fishes swim through your consciousness, unlocking the infinite ocean of universal wisdom."
+            ]
+        };
+
+        // UI Target Components
+        const picker = document.getElementById('zodiac-picker');
+        const rerollBtn = document.getElementById('reroll-btn');
+        const displayBox = document.getElementById('oracle-display');
+        const titleEl = document.getElementById('sign-title');
+        const metaEl = document.getElementById('prediction-meta');
+        const textEl = document.getElementById('fortune-text');
+
+        let activeSign = "";
+        let targetedSignIndex = -1;
+        
+        // 3D Vault Configurations
+        let stars = [];
+        let zodiacConstellations = [];
+        let projectedNodesCache = []; // Caches screen locations for click calculation raycasts
+        
+        let rotY = 0;   
+        let rotX = 0.35; 
+        
+        // 3D Target Center Display State
+        let centerSignGroup = null;
+
+        // Initialize picker change logic
+        picker.addEventListener('change', (e) => {
+            selectSignByName(e.target.value);
+        });
+
+        rerollBtn.addEventListener('click', () => {
+            if (activeSign) generateFortune();
+        });
+
+        // Combined selection machine state handler
+        function selectSignByName(name) {
+            activeSign = name;
+            picker.value = name;
+            rerollBtn.style.display = 'block';
+            
+            const keys = Object.keys(horoscopeDatabase);
+            targetedSignIndex = keys.indexOf(name);
+            
+            // Re-instantiate the 3D projection model duplicate explicitly positioned in dead center space
+            const originTemplate = zodiacConstellations[targetedSignIndex];
+            centerSignGroup = {
+                name: originTemplate.name,
+                symbol: originTemplate.symbol,
+                geometryStars: originTemplate.geometryStars.map(s => ({ ...s })),
+                scaleUp: 0 // Used to animate scaling introduction properties cleanly
+            };
+
+            generateFortune();
+        }
+
+        function generateFortune() {
+            const index = Math.floor(Math.random() * 30);
+            const selectedText = horoscopeDatabase[activeSign][index];
+            
+            titleEl.innerText = activeSign.toUpperCase();
+            metaEl.innerText = `Prediction Profile Alignment Matrix: Index #${index + 1} of 30`;
+            textEl.innerText = selectedText;
+            displayBox.style.display = 'block';
+        }
+
+        // Build Starfield Coordinates
+        for (let i = 0; i < 400; i++) {
+            stars.push({
+                x: (Math.random() - 0.5) * 1200,
+                y: (Math.random() - 0.5) * 1200,
+                z: Math.random() * 800
+            });
+        }
+
+        const ASCII_SYMBOLS = {
+            Aries: "Aries ♈", Taurus: "Taurus ♉", Gemini: "Gemini ♊", Cancer: "Cancer ♋", Leo: "Leo ♌", Virgo: "Virgo ♍",
+            Libra: "Libra ♎", Scorpio: "Scorpio ♏", Sagittarius: "Sagittarius ♐", Capricorn: "Capricorn ♑", Aquarius: "Aquarius ♒", Pisces: "Pisces ♓"
+        };
+
+        const signKeys = Object.keys(horoscopeDatabase);
+        const vaultRadius = 260;
+
+        for (let i = 0; i < 12; i++) {
+            let theta = (i / 12) * Math.PI * 2;
+            let localStars = [];
+            let starCount = 6 + Math.floor(Math.random() * 4);
+            
+            for(let s=0; s<starCount; s++) {
+                localStars.push({
+                    dx: (Math.random() - 0.5) * 45,
+                    dy: (Math.random() - 0.5) * 45,
+                    dz: (Math.random() - 0.5) * 45
+                });
+            }
+
+            zodiacConstellations.push({
+                name: signKeys[i],
+                symbol: ASCII_SYMBOLS[signKeys[i]],
+                cx: Math.cos(theta) * vaultRadius,
+                cy: 0,
+                cz: Math.sin(theta) * vaultRadius,
+                geometryStars: localStars
+            });
+        }
+
+        // Mouse Press Coordinates Trackers (To distinguish click action vs drag cycles)
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let currentRotY = 0;
+        let currentRotX = 0;
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON') return;
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            currentRotY = rotY;
+            currentRotX = rotX;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            let dx = e.clientX - startX;
+            let dy = e.clientY - startY;
+            
+            rotY = currentRotY + dx * 0.005;
+            rotX = currentRotX + dy * 0.005;
+            rotX = Math.max(-0.9, Math.min(0.9, rotX));
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+
+            // Compute distance variance: if cursor basically hasn't traveled, evaluate click event
+            let deltaX = Math.abs(e.clientX - startX);
+            let deltaY = Math.abs(e.clientY - startY);
+            
+            if (deltaX < 5 && deltaY < 5) {
+                processRaycastClick(e.clientX, e.clientY);
+            }
+        });
+
+        // --- 2. Raycast Intersection Coordinate Interception Engine ---
+        function processRaycastClick(mouseX, mouseY) {
+            let clickedSign = null;
+            let closestDist = 45; // Maximum radial distance tolerance padding in pixels around the click coordinate
+
+            projectedNodesCache.forEach(node => {
+                let dx = mouseX - node.px;
+                let dy = mouseY - node.py;
+                let hitDistance = Math.sqrt(dx * dx + dy * dy);
+
+                if (hitDistance < closestDist) {
+                    closestDist = hitDistance;
+                    clickedSign = node.name;
+                }
+            });
+
+            if (clickedSign) {
+                selectSignByName(clickedSign);
+            }
+        }
+
+        // --- 3. Rendering Runtime Pacing Loops ---
+        function drawUniverse() {
+            requestAnimationFrame(drawUniverse);
+
+            ctx.fillStyle = '#020106';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let centerX = canvas.width / 2;
+            let centerY = canvas.height / 2;
+            let elapsed = Date.now() * 0.0004;
+
+            if (!isDragging) {
+                rotY += 0.0012; // Slow background rotational glide speed
+            }
+
+            // A. Backdrop Stars rendering passes
+            stars.forEach(s => {
+                let scale = 450 / (s.z + 450);
+                let sx = centerX + s.x * scale;
+                let sy = centerY + s.y * scale;
+                if (sx >= 0 && sx < canvas.width && sy >= 0 && sy < canvas.height) {
+                    let blink = (1.2 * (1 - s.z / 800)) + (Math.sin(elapsed * 5 + s.x) * 0.3);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.globalAlpha = 0.1 + (1 - s.z / 800) * 0.7;
+                    ctx.fillRect(sx, sy, blink, blink);
+                }
+            });
+            ctx.globalAlpha = 1.0;
+
+            // B. Project Outer Ring Elements & Populate Calculation Caches
+            projectedNodesCache = [];
+
+            zodiacConstellations.forEach((con, idx) => {
+                let x1 = con.cx * Math.cos(rotY) - con.cz * Math.sin(rotY);
+                let z1 = con.cx * Math.sin(rotY) + con.cz * Math.cos(rotY);
+                let y2 = con.cy * Math.cos(rotX) - z1 * Math.sin(rotX);
+                let z2 = con.cy * Math.sin(rotX) + z1 * Math.cos(rotX);
+
+                let isSelectedInUI = (idx === targetedSignIndex);
+                if (isSelectedInUI) {
+                    y2 += Math.sin(Date.now() * 0.005) * 8; // Float path sways
+                }
+
+                let scale = 500 / (z2 + 450);
+                let px = centerX + x1 * scale;
+                let py = centerY + y2 * scale;
+
+                // Project localized constellation geometry nodes
+                let subPoints = con.geometryStars.map(s => {
+                    let sx = con.cx + s.dx;
+                    let sy = con.cy + s.dy;
+                    let sz = con.cz + s.dz;
+                    if (isSelectedInUI) sy += Math.sin(Date.now() * 0.005) * 8;
+
+                    let rx = sx * Math.cos(rotY) - sz * Math.sin(rotY);
+                    let rz = sx * Math.sin(rotY) + sz * Math.cos(rotY);
+                    let ry = sy * Math.cos(rotX) - rz * Math.sin(rotX);
+                    let finalZ = sy * Math.sin(rotX) + rz * Math.cos(rotX);
+
+                    return { x: centerX + rx * (500 / (finalZ + 450)), y: centerY + ry * (500 / (finalZ + 450)) };
+                });
+
+                projectedNodesCache.push({
+                    name: con.name,
+                    symbol: con.symbol,
+                    index: idx,
+                    px: px,
+                    py: py,
+                    pz: z2,
+                    scale: scale,
+                    subPoints: subPoints,
+                    isFocused: isSelectedInUI
+                });
+            });
+
+            // Sort depth configurations layer values
+            projectedNodesCache.sort((a, b) => b.pz - a.pz);
+
+            // C. Draw Interstitial Ring Guidelines & Network Grid paths
+            projectedNodesCache.forEach(node => {
+                let depthFadeAlpha = Math.max(0.08, 1 - (node.pz / vaultRadius));
+                ctx.save();
+                ctx.globalAlpha = node.isFocused ? 1.0 : depthFadeAlpha;
+
+                // Render lines within the star collection group mapping
+                ctx.lineWidth = node.isFocused ? 2 : 1;
+                ctx.strokeStyle = node.isFocused ? '#00ffff' : 'rgba(138, 43, 226, 0.35)';
+                for(let i = 0; i < node.subPoints.length - 1; i++) {
+                    ctx.beginPath(); ctx.moveTo(node.subPoints[i].x, node.subPoints[i].y); ctx.lineTo(node.subPoints[i+1].x, node.subPoints[i+1].y); ctx.stroke();
+                }
+                ctx.beginPath(); ctx.moveTo(node.subPoints[node.subPoints.length-1].x, node.subPoints[node.subPoints.length-1].y); ctx.lineTo(node.subPoints[0].x, node.subPoints[0].y); ctx.stroke();
+
+                // Draw tiny stars nodes points
+                ctx.fillStyle = node.isFocused ? '#ffffff' : '#da70d6';
+                node.subPoints.forEach(pt => {
+                    ctx.beginPath(); ctx.arc(pt.x, pt.y, node.isFocused ? 3 : 1.5, 0, Math.PI * 2); ctx.fill();
+                });
+
+                // Display names floating above nodes mapping sites
+                ctx.fillStyle = node.isFocused ? '#00ffff' : '#ffffff';
+                ctx.font = node.isFocused ? 'bold 13px Consolas' : '10px Consolas';
+                ctx.textAlign = 'center';
+                ctx.fillText(node.symbol, node.px, node.py - 12);
+
+                ctx.restore();
+            });
+
+            // D. FEATURE COMPONENT: Projected Focal Center Active Sign Model
+            if (centerSignGroup) {
+                // Interpolate scale values up to simulate smooth entry explosions zoom properties
+                if (centerSignGroup.scaleUp < 1) {
+                    centerSignGroup.scaleUp += (1 - centerSignGroup.scaleUp) * 0.08;
+                }
+
+                // Slowly spin the centered object independently along a stylized view pitch frame array
+                let centerTime = Date.now() * 0.001;
+                ctx.save();
+                
+                // Add a glowing energy portal background behind the center constellation
+                let portalRad = 85 * centerSignGroup.scaleUp;
+                let portalGlow = ctx.createRadialGradient(centerX, centerY, portalRad * 0.2, centerX, centerY, portalRad);
+                portalGlow.addColorStop(0, 'rgba(138, 43, 226, 0.2)');
+                portalGlow.addColorStop(0.5, 'rgba(0, 255, 255, 0.05)');
+                portalGlow.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = portalGlow;
+                ctx.beginPath(); ctx.arc(centerX, centerY, portalRad, 0, Math.PI * 2); ctx.fill();
+
+                // Compute center coordinates map rotations matrix variations natively
+                let centerRotatedPoints = centerSignGroup.geometryStars.map(s => {
+                    // Spin along standard vertical coordinate offsets axis properties
+                    let rx = s.dx * Math.cos(centerTime) - s.dz * Math.sin(centerTime);
+                    let rz = s.dx * Math.sin(centerTime) + s.dz * Math.cos(centerTime);
+                    // Magnify positions outwards matching entry scale multipliers
+                    return {
+                        x: centerX + (rx * 2.2 * centerSignGroup.scaleUp),
+                        y: centerY + (s.dy * 2.2 * centerSignGroup.scaleUp) + (Math.sin(Date.now() * 0.003) * 5) // Float sways sync
+                    };
+                });
+
+                // Draw central highlighted constellation linking paths outlines
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#00ffff';
+                
+                for(let i = 0; i < centerRotatedPoints.length - 1; i++) {
+                    ctx.beginPath(); ctx.moveTo(centerRotatedPoints[i].x, centerRotatedPoints[i].y); ctx.lineTo(centerRotatedPoints[i+1].x, centerRotatedPoints[i+1].y); ctx.stroke();
+                }
+                ctx.beginPath(); ctx.moveTo(centerRotatedPoints[centerRotatedPoints.length-1].x, centerRotatedPoints[centerRotatedPoints.length-1].y); ctx.lineTo(centerRotatedPoints[0].x, centerRotatedPoints[0].y); ctx.stroke();
+
+                // Draw solid star core points
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowBlur = 8;
+                centerRotatedPoints.forEach(pt => {
+                    ctx.beginPath(); ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2); ctx.fill();
+                });
+
+                ctx.restore();
+            }
+        }
+
+        drawUniverse();
+    </script>
+</body>
+</html>
