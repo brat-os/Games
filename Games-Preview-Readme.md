@@ -18,6 +18,11 @@ Sniper-js.html
 
 <img width="944" height="427" alt="Screenshot 2026-06-20 212653" src="https://github.com/user-attachments/assets/13be7661-1280-46ef-b736-0550566ff188" />
 
+CosmicHoroscop-js.html
+
+<img width="944" height="430" alt="Screenshot 2026-06-20 214340" src="https://github.com/user-attachments/assets/28ff358c-e6da-4caf-8422-c9d5cc384d0a" />
+
+
 
 
 
