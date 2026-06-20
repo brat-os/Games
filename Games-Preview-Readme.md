@@ -12,7 +12,8 @@ Snake-Powershell.ps1
 
 SolarSytem-js.html
 
-<img width="945" height="434" alt="image" src="https://github.com/user-attachments/assets/62a14cff-469c-4ac2-98cc-1ae3a4aac289" />
+<img width="945" height="434" alt="Screenshot 2026-06-20 211757" src="https://github.com/user-attachments/assets/d4b82870-cc9a-41ec-bbe0-30574e61114b" />
+
 
 
 
