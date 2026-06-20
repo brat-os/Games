@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas 2D Tactical Sniper Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #03070a;
+            font-family: 'Consolas', monospace;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ff66;
+            background: rgba(2, 8, 5, 0.9);
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #00ff66;
+            pointer-events: none;
+            z-index: 10;
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.15);
+        }
+        h1 { margin: 0 0 5px 0; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
+        p { margin: 3px 0; font-size: 13px; }
+        
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(1, 4, 6, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 5;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="blocker">
+        <div>
+            <h2 style="color: #00ff66;">TACTICAL CANVAS SNIPER</h2>
+            <p style="margin-top: 10px;">Click Anywhere to Calibrate Rifle Scope</p>
+        </div>
+    </div>
+
+    <div id="hud">
+        <h1>Operation Range</h1>
+        <p>Score: <span id="score-val">0</span></p>
+        <p>Targets Remaining: <span id="target-val">8</span></p>
+        <p style="color: #ffaa00; margin-top: 10px;">• Move Mouse to Pan Aim Scope</p>
+        <p style="color: #ffaa00;">• Left Click to Shoot</p>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        /**
+         * @fileoverview Tactical Pseudo-3D Sniper Engine using HTML5 Canvas
+         * @author Alexandru Bratosin
+         */
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const blocker = document.getElementById('blocker');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Game State Variables
+        let score = 0;
+        let totalTargets = 8;
+        let targets = [];
+        let sceneryElements = [];
+        let muzzleFlashActive = false;
+        let flashTimer = 0;
+
+        // Camera control tracking coordinates
+        let aimX = 0;
+        let aimY = 0;
+
+        // --- 1. Generate Deep Background Scenery & Targets ---
+        function initEnvironment() {
+            targets = [];
+            sceneryElements = [];
+
+            // Generate structural background mountains/hills
+            for (let i = 0; i < 12; i++) {
+                sceneryElements.push({
+                    type: 'mountain',
+                    x: (i * 200) - 1000,
+                    y: 0,
+                    width: 300 + Math.random() * 200,
+                    height: 120 + Math.random() * 100,
+                    color: ['#141d26', '#1c2630', '#18222c'][Math.floor(Math.random() * 3)]
+                });
+            }
+
+            // Generate localized guard towers and range structures
+            for (let i = 0; i < 8; i++) {
+                sceneryElements.push({
+                    type: 'tower',
+                    x: (Math.random() - 0.5) * 1200,
+                    y: -40,
+                    z: 300 + Math.random() * 400
+                });
+            }
+
+            // Generate targets distributed into depth tiers
+            for (let i = 0; i < totalTargets; i++) {
+                targets.push({
+                    x: (Math.random() - 0.5) * 600,
+                    y: -60 - Math.random() * 120, 
+                    z: 200 + Math.random() * 350,  
+                    radius: 30,
+                    swayOffset: Math.random() * Math.PI * 2
+                });
+            }
+        }
+        initEnvironment();
+
+        // --- 2. Pointer Lock Aim Configurations ---
+        window.addEventListener('click', () => {
+            if (document.pointerLockElement !== canvas) {
+                canvas.requestPointerLock();
+            }
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            blocker.style.display = (document.pointerLockElement === canvas) ? 'none' : 'flex';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement !== canvas) return;
+
+            aimX += e.movementX * 0.5;
+            aimY += e.movementY * 0.5;
+
+            // Strict camera clamping boundaries
+            aimX = Math.max(-600, Math.min(600, aimX));
+            aimY = Math.max(-250, Math.min(250, aimY));
+        });
+
+        // --- 3. Ballistic Processing ---
+        window.addEventListener('mousedown', () => {
+            if (document.pointerLockElement !== canvas || totalTargets === 0) return;
+
+            muzzleFlashActive = true;
+            flashTimer = 3;
+            aimY -= 35; // Sharp heavy weapon recoil displacement
+
+            for (let i = targets.length - 1; i >= 0; i--) {
+                let t = targets[i];
+                let scaleFactor = 450 / t.z;
+                
+                let screenX = canvas.width / 2 + ((t.x - aimX) * scaleFactor);
+                let screenY = canvas.height / 2 + ((t.y - aimY) * scaleFactor);
+                let projectedRadius = t.radius * scaleFactor;
+
+                let dx = screenX - (canvas.width / 2);
+                let dy = screenY - (canvas.height / 2);
+                
+                if (Math.sqrt(dx * dx + dy * dy) <= projectedRadius) {
+                    targets.splice(i, 1);
+                    score += 100;
+                    totalTargets--;
+
+                    document.getElementById('score-val').innerText = score;
+                    document.getElementById('target-val').innerText = totalTargets;
+
+                    if (totalTargets === 0) {
+                        document.exitPointerLock();
+                        document.getElementById('hud').innerHTML = "<h1 style='color: #ffcc00;'>ALL TARGETS ELIMINATED</h1><p>Final Score: " + score + "</p><p>Refresh to restart.</p>";
+                    }
+                    break;
+                }
+            }
+        });
+
+        // --- 4. Main Rendering Framework ---
+        function drawFrame() {
+            requestAnimationFrame(drawFrame);
+
+            let horizonY = canvas.height / 2 - aimY;
+
+            // Sky Backdrop Gradient
+            let skyGradient = ctx.createLinearGradient(0, 0, 0, horizonY);
+            skyGradient.addColorStop(0, '#0a1015');
+            skyGradient.addColorStop(1, '#1b2631');
+            ctx.fillStyle = skyGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Render Background Mountains (Parallax Layer)
+            sceneryElements.forEach(el => {
+                if (el.type === 'mountain') {
+                    ctx.fillStyle = el.color;
+                    ctx.beginPath();
+                    // Shift horizontal layout inversely to camera aimX to execute parallax depth
+                    let renderX = el.x - (aimX * 0.2);
+                    ctx.moveTo(renderX, horizonY);
+                    ctx.lineTo(renderX + el.width / 2, horizonY - el.height);
+                    ctx.lineTo(renderX + el.width, horizonY);
+                    ctx.fill();
+                }
+            });
+
+            // Ground Baseline
+            ctx.fillStyle = '#222f3d';
+            ctx.fillRect(0, horizonY, canvas.width, canvas.height);
+
+            // Draw Ground Range Track Grid Lines
+            ctx.strokeStyle = '#00ff66';
+            ctx.lineWidth = 1;
+            for (let i = -15; i <= 15; i++) {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.15;
+                ctx.moveTo(canvas.width / 2 + (i * 180) - aimX, canvas.height);
+                ctx.lineTo(canvas.width / 2 - (aimX * 0.05), horizonY);
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Render Scenery Guard Towers
+            let time = Date.now() * 0.003;
+            sceneryElements.forEach(el => {
+                if (el.type === 'tower') {
+                    let scale = 450 / el.z;
+                    let scrX = canvas.width / 2 + ((el.x - aimX) * scale);
+                    let scrY = horizonY + (el.y * scale);
+                    
+                    if (scrX > -100 && scrX < canvas.width + 100) {
+                        ctx.fillStyle = '#161f26';
+                        ctx.strokeStyle = '#0f161c';
+                        ctx.lineWidth = 2;
+                        // Structural Base Frame legs
+                        ctx.fillRect(scrX - 10 * scale, scrY, 20 * scale, 60 * scale);
+                        ctx.strokeRect(scrX - 10 * scale, scrY, 20 * scale, 60 * scale);
+                        // Observation platform box top
+                        ctx.fillStyle = '#2d3d4a';
+                        ctx.fillRect(scrX - 18 * scale, scrY - 20 * scale, 36 * scale, 20 * scale);
+                        ctx.strokeRect(scrX - 18 * scale, scrY - 20 * scale, 36 * scale, 20 * scale);
+                    }
+                }
+            });
+
+            // Update and Project Targets
+            targets.sort((a, b) => b.z - a.z);
+            targets.forEach((t, idx) => {
+                let currentY = t.y + Math.sin(time + idx) * 12;
+                let scale = 450 / t.z;
+                let scrX = canvas.width / 2 + ((t.x - aimX) * scale);
+                let scrY = canvas.height / 2 + ((currentY - aimY) * scale);
+                let rad = t.radius * scale;
+
+                if (t.z > 10 && scrX > -50 && scrX < canvas.width + 50) {
+                    // Draw target mounting beam frame
+                    let groundBaseY = horizonY + (0 * scale);
+                    ctx.strokeStyle = '#435466';
+                    ctx.lineWidth = Math.max(2, 5 * scale);
+                    ctx.beginPath();
+                    ctx.moveTo(scrX, scrY);
+                    ctx.lineTo(scrX, groundBaseY);
+                    ctx.stroke();
+
+                    // Outer Target Circle
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.beginPath();
+                    ctx.arc(scrX, scrY, rad, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = Math.max(1, 2 * scale);
+                    ctx.stroke();
+
+                    // Inner Ring
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(scrX, scrY, rad * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Bullseye Pin
+                    ctx.fillStyle = '#c0392b';
+                    ctx.beginPath();
+                    ctx.arc(scrX, scrY, rad * 0.15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            // --- 5. Render High-Detail Real Sniper Rifle Cam ---
+            // Built using complex layered canvas vectors to draw a detailed rifle chassis overlay
+            let breathingSwayX = Math.sin(time * 0.6) * 3;
+            let breathingSwayY = Math.cos(time * 1.2) * 2;
+            let gunX = canvas.width * 0.72 + breathingSwayX;
+            let gunY = canvas.height * 0.75 + breathingSwayY;
+
+            ctx.save();
+            // Dark military matte structural shading styles
+            ctx.fillStyle = '#1c1f22';
+            ctx.strokeStyle = '#0c0d0e';
+            ctx.lineWidth = 3;
+
+            // Main receiver stock frame assembly
+            ctx.beginPath();
+            ctx.moveTo(gunX - 50, canvas.height);
+            ctx.lineTo(gunX - 40, gunY + 40);
+            ctx.lineTo(gunX + 110, gunY + 60);
+            ctx.lineTo(gunX + 160, canvas.height);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Tactical Long Barrel extension tapering forward to screen crosshair center path angles
+            ctx.fillStyle = '#111215';
+            ctx.beginPath();
+            ctx.moveTo(gunX - 35, gunY + 45);
+            ctx.lineTo(canvas.width / 2 + 12, canvas.height / 2 + 55); // Muzzle end diameter top vector
+            ctx.lineTo(canvas.width / 2 + 12, canvas.height / 2 + 65); // Muzzle end diameter bottom vector
+            ctx.lineTo(gunX - 30, gunY + 70);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Heavy Flash Suppressor muzzle brake tip component mounted on barrel crown edge
+            ctx.fillStyle = '#25292e';
+            ctx.fillRect(canvas.width / 2 + 10, canvas.height / 2 + 52, 14, 16);
+            ctx.strokeRect(canvas.width / 2 + 10, canvas.height / 2 + 52, 14, 16);
+
+            // Elevated Optical Scope mounting rail block
+            ctx.fillStyle = '#2c3136';
+            ctx.fillRect(gunX - 25, gunY + 10, 80, 20);
+            ctx.strokeRect(gunX - 25, gunY + 10, 80, 20);
+
+            // Tactical Scope Cylinder bodies
+            ctx.fillStyle = '#0f1112';
+            ctx.beginPath();
+            ctx.arc(gunX + 15, gunY, 16, 0, Math.PI * 2); // Rear eyepiece lens ring housing
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
+
+            // --- 6. Render Scoped Overlay Mask Viewports ---
+            let centerX = canvas.width / 2;
+            let centerY = canvas.height / 2;
+
+            // Reticle boundary line guide ring
+            ctx.strokeStyle = 'rgba(0, 255, 102, 0.85)';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 200, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Heavy peripheral blackout viewport mask overlays 
+            ctx.fillStyle = 'rgba(2, 6, 4, 0.82)';
+            ctx.fillRect(0, 0, canvas.width, centerY - 200); // Upper viewport curtain block
+            ctx.fillRect(0, centerY + 200, canvas.width, canvas.height - (centerY + 200)); // Lower viewport curtain block
+            ctx.fillRect(0, centerY - 200, centerX - 200, 400); // Left sidebar border block
+            ctx.fillRect(centerX + 200, centerY - 200, canvas.width - (centerX + 200), 400); // Right sidebar border block
+
+            // Scope Internal Etched Reticle Crosshairs lines
+            ctx.strokeStyle = 'rgba(0, 255, 102, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            // Horizontal line plane elements
+            ctx.moveTo(centerX - 180, centerY);
+            ctx.lineTo(centerX + 180, centerY);
+            // Vertical line plane elements
+            ctx.moveTo(centerX, centerY - 180);
+            ctx.lineTo(centerX, centerY + 180);
+            ctx.stroke();
+
+            // Sub-etched tactical elevation markers along crosshair lines
+            ctx.lineWidth = 1;
+            for(let offset = -140; offset <= 140; offset += 35) {
+                if(offset === 0) continue;
+                // Draw horizontal ticks
+                ctx.beginPath(); ctx.moveTo(centerX + offset, centerY - 5); ctx.lineTo(centerX + offset, centerY + 5); ctx.stroke();
+                // Draw vertical ticks
+                ctx.beginPath(); ctx.moveTo(centerX - 5, centerY + offset); ctx.lineTo(centerX + 5, centerY + offset); ctx.stroke();
+            }
+
+            // Center absolute targeting red laser point
+            ctx.fillStyle = '#ff2222';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // G. Process Muzzle Trigger Fire Flash Overlays
+            if (muzzleFlashActive) {
+                ctx.fillStyle = 'rgba(255, 235, 195, 0.92)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                flashTimer--;
+                if (flashTimer <= 0) muzzleFlashActive = false;
+            }
+        }
+
+        drawFrame();
+    </script>
+</body>
+</html>
