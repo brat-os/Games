@@ -1,6 +1,5 @@
-Please read the license file.
-
-Powershell games need Powerhsell ISE to run
+Please read the license file that applies to all listed games.
+Powershell games need Powerhsell ISE to run.
 
 Run-Powershell
 
