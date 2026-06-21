@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Cyber Drone Evader</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #030206;
+            font-family: 'Consolas', monospace;
+            color: #ffffff;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(8, 4, 16, 0.85);
+            padding: 15px 25px;
+            border-radius: 6px;
+            border: 1px solid #ff007f;
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.25);
+            pointer-events: none;
+        }
+        h1 { margin: 0 0 5px 0; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; color: #ff007f; }
+        p { margin: 3px 0; font-size: 13px; color: #00ffff; }
+        
+        #game-over-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(5, 2, 10, 0.95);
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="hud">
+        <h1>Skyrunner Matrix</h1>
+        <p>Distance: <span id="score-val">0</span>m</p>
+        <p style="color: #ffaa00; margin-top: 5px;">• Controls: W,A,S,D or Arrow Keys</p>
+    </div>
+
+    <div id="game-over-screen">
+        <h2 style="color: #ff007f; margin: 0 0 10px 0; font-size: 24px;">DRONE DISINTEGRATED</h2>
+        <p id="final-score" style="color: #ffffff; font-size: 14px; margin-bottom: 20px;"></p>
+        <p style="color: #00ffff; font-size: 12px; animation: pulse 1.5s infinite;">Press ANY KEY to reboot system</p>
+    </div>
+
+    <canvas id="flightCanvas"></canvas>
+
+    <script>
+        /**
+         * @fileoverview Visually Stunning Cyberpunk Drone Obstacle Runner
+         * @author Alexandru Bratosin
+         */
+
+        const canvas = document.getElementById('flightCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Game Configuration Settings
+        let score = 0;
+        let isGameOver = false;
+        let keys = {};
+
+        // --- 1. Entity Object Structures ---
+        const drone = {
+            x: 150,
+            y: window.innerHeight / 2,
+            vx: 0,
+            vy: 0,
+            speed: 0.6,
+            friction: 0.92,
+            width: 50,
+            height: 20,
+            tilt: 0
+        };
+
+        let obstacles = [];
+        let particles = [];
+        let backdropBuildings = [];
+
+        // Build Multi-Layered Parallax Neon Sky Scrapers Background
+        function initBackdrop() {
+            backdropBuildings = [];
+            // Layer 1 (Distant Silhouette Horizon)
+            for (let i = 0; i < 15; i++) {
+                backdropBuildings.push({
+                    x: i * 140,
+                    width: 100 + Math.random() * 80,
+                    height: 180 + Math.random() * 200,
+                    layer: 1,
+                    color: '#0d0a1a'
+                });
+            }
+            // Layer 2 (Midground Neon Profiles)
+            for (let i = 0; i < 12; i++) {
+                backdropBuildings.push({
+                    x: i * 220,
+                    width: 120 + Math.random() * 100,
+                    height: 250 + Math.random() * 250,
+                    layer: 2,
+                    color: '#16112c',
+                    accent: '#ff007f'
+                });
+            }
+        }
+        initBackdrop();
+
+        // Obstacle Factory
+        function spawnObstacle() {
+            let width = 40 + Math.random() * 30;
+            let height = 150 + Math.random() * (canvas.height - 350);
+            let isTopGate = Math.random() > 0.5;
+
+            obstacles.push({
+                x: canvas.width + 100,
+                y: isTopGate ? 0 : canvas.height - height,
+                width: width,
+                height: height,
+                color: ['#00ffff', '#bd00ff', '#ff0055'][Math.floor(Math.random() * 3)],
+                pulseOffset: Math.random() * Math.PI
+            });
+        }
+
+        // --- 2. Key Bindings Processing Hooks ---
+        window.addEventListener('keydown', (e) => {
+            if (isGameOver) {
+                resetGame();
+                return;
+            }
+            keys[e.key.toLowerCase()] = true;
+            keys[e.key] = true; // Support alternative arrows triggers
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+            keys[e.key] = false;
+        });
+
+        function resetGame() {
+            score = 0;
+            isGameOver = false;
+            obstacles = [];
+            particles = [];
+            drone.y = canvas.height / 2;
+            drone.vx = 0;
+            drone.vy = 0;
+            document.getElementById('game-over-screen').style.display = 'none';
+            initBackdrop();
+        }
+
+        // --- 3. Core Physics Real-Time Transformation Loops ---
+        let frameCount = 0;
+        let globalGameSpeed = 4.5;
+
+        function runFlightEngine() {
+            requestAnimationFrame(runFlightEngine);
+            frameCount++;
+
+            // Global Vector Clear
+            ctx.fillStyle = '#04020a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // A. UPDATE & DRAW PARALLAX BACKDROP SCENERY
+            backdropBuildings.forEach(b => {
+                // Shift backdrop vectors relative to the defined speed tier multiplier
+                let scrollModifier = b.layer === 1 ? 0.4 : 1.2;
+                b.x -= scrollModifier;
+                
+                if (b.x + b.width < 0) b.x = canvas.width + 50;
+
+                ctx.fillStyle = b.color;
+                ctx.fillRect(b.x, canvas.height - b.height, b.width, b.height);
+
+                // Draw neon window profile hashes on Layer 2 Midground blocks
+                if (b.layer === 2) {
+                    ctx.strokeStyle = b.accent;
+                    ctx.lineWidth = 1;
+                    ctx.globalAlpha = 0.15;
+                    ctx.strokeRect(b.x, canvas.height - b.height, b.width, b.height);
+                    ctx.globalAlpha = 1.0;
+                }
+            });
+
+            if (isGameOver) {
+                drawDrone();
+                drawObstacles();
+                return;
+            }
+
+            // B. COMPUTE FLIGHT COMMAND INPUT FORCES
+            if (keys['w'] || keys['ArrowUp']) drone.vy -= drone.speed;
+            if (keys['s'] || keys['ArrowDown']) drone.vy += drone.speed;
+            if (keys['a'] || keys['ArrowLeft']) drone.vx -= drone.speed;
+            if (keys['d'] || keys['ArrowRight']) drone.vx += drone.speed;
+
+            // Apply friction vectors to structural velocities
+            drone.vx *= drone.friction;
+            drone.vy *= drone.friction;
+            drone.x += drone.vx;
+            drone.y += drone.vy;
+
+            // Mathematical calculation setting flight bank tilts dynamically mapping forward velocities
+            drone.tilt = (drone.vy * 0.03) + (drone.vx * 0.01);
+
+            // Keep drone strictly trapped inside viewport borders
+            drone.x = Math.max(50, Math.min(canvas.width * 0.6, drone.x));
+            drone.y = Math.max(30, Math.min(canvas.height - 30, drone.y));
+
+            // C. RENDER ROTOR FLUID EXHAUST SPARK PARTICLES
+            if (frameCount % 2 === 0) {
+                particles.push({
+                    x: drone.x - 15,
+                    y: drone.y + (Math.random() - 0.5) * 8,
+                    vx: -globalGameSpeed - (Math.random() * 2),
+                    vy: (Math.random() - 0.5) * 2,
+                    alpha: 1.0,
+                    size: 2 + Math.random() * 3,
+                    color: '#00ffff'
+                });
+            }
+
+            // Update exhaust particles array frame
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = p.color;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                ctx.restore();
+            }
+
+            // D. MANAGE OBSTACLES SPACES
+            if (frameCount % 90 === 0) {
+                spawnObstacle();
+                score += 10;
+                document.getElementById('score-val').innerText = score;
+                if (score % 50 === 0) globalGameSpeed += 0.5; // Scaled difficulty multiplier acceleration
+            }
+
+            drawObstacles();
+            drawDrone();
+
+            // E. EVALUATE CRITICAL HULL COLLISION MATRIX MAPPINGS
+            obstacles.forEach(obs => {
+                // Bounding boxes intersection matrix evaluation equations
+                if (drone.x + drone.width / 2 > obs.x && 
+                    drone.x - drone.width / 2 < obs.x + obs.width &&
+                    drone.y + drone.height / 2 > obs.y && 
+                    drone.y - drone.height / 2 < obs.y + obs.height) {
+                    
+                    // Trigger destructive failure crash loops
+                    isGameOver = true;
+                    document.getElementById('final-score').innerText = `Traveled Vector Path: ${score} meters`;
+                    document.getElementById('game-over-screen').style.display = 'block';
+                }
+            });
+        }
+
+        // --- 4. Sub-Rendering Graphical Composers ---
+        function drawDrone() {
+            ctx.save();
+            ctx.translate(drone.x, drone.y);
+            ctx.rotate(drone.tilt);
+
+            // Apply vibrant cyberpunk glowing drop-shadows around drone geometry lines
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff007f';
+
+            // Main Core Fuselage Frame
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-20, -4, 40, 8);
+
+            // Outrigger Rotors Wings (Quadcopter Structural Arms)
+            ctx.strokeStyle = '#ff007f';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-20, 0); ctx.lineTo(-32, -10);
+            ctx.moveTo(20, 0);  ctx.lineTo(32, -10);
+            ctx.moveTo(-10, 0); ctx.lineTo(-18, 12);
+            ctx.moveTo(10, 0);  ctx.lineTo(18, 12);
+            ctx.stroke();
+
+            // Rotor Engine Caps (Glow hubs)
+            ctx.fillStyle = '#00ffff';
+            ctx.shadowColor = '#00ffff';
+            ctx.fillRect(-36, -13, 8, 4);
+            ctx.fillRect(28, -13, 8, 4);
+            ctx.fillRect(-22, 12, 8, 4);
+            ctx.fillRect(14, 12, 8, 4);
+
+            ctx.restore();
+        }
+
+        function drawObstacles() {
+            obstacles.forEach((obs, idx) => {
+                if (!isGameOver) obs.x -= globalGameSpeed;
+
+                let pulseSize = Math.sin((frameCount * 0.05) + obs.pulseOffset) * 6;
+
+                ctx.save();
+                ctx.shadowBlur = 20 + pulseSize;
+                ctx.shadowColor = obs.color;
+                
+                // Clear interior column structures fills
+                ctx.fillStyle = 'rgba(10, 5, 20, 0.8)';
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+                // High-glowing perimeter energy bounding lines
+                ctx.strokeStyle = obs.color;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
+
+                // Inner core frequency beam accent line
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(obs.x + obs.width / 2, obs.y);
+                ctx.lineTo(obs.x + obs.width / 2, obs.y + obs.height);
+                ctx.stroke();
+
+                ctx.restore();
+            });
+
+            // Clean historical elements passing off screen boundaries
+            if (obstacles.length > 0 && obstacles[0].x < -100) {
+                obstacles.shift();
+            }
+        }
+
+        // Launch operational framework execution loops
+        runFlightEngine();
+    </script>
+</body>
+</html>
