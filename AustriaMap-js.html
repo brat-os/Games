@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Austria Interactive 3D Topographic Map</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0d1117;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            color: #333333;
+            user-select: none;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+            max-width: 340px;
+            border-top: 5px solid #c6001a; 
+        }
+        h1 { margin: 0 0 2px 0; font-size: 20px; font-weight: 700; color: #c6001a; letter-spacing: 0.5px; }
+        .legend { margin: 0 0 15px 0; font-size: 11px; color: #666666; font-style: italic; }
+        .scroll-container { max-height: 350px; overflow-y: auto; padding-right: 5px; }
+        
+        .location-item { 
+            margin: 8px 0; 
+            padding: 10px;
+            font-size: 13px; 
+            color: #444444; 
+            line-height: 1.4; 
+            border: 1px solid #eeeeee; 
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #ffffff;
+        }
+        .location-item:hover { 
+            background: #fff5f5;
+            border-color: #c6001a;
+            transform: translateY(-1px);
+        }
+        .location-item.active {
+            background: #c6001a;
+            color: #ffffff;
+            border-color: #c6001a;
+        }
+        .location-item.active b { color: #ffffff; }
+        .location-item b { color: #111116; font-size: 14px; transition: color 0.2s; }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            color: #222222;
+            padding: 8px 24px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            pointer-events: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="hud">
+        <h1>Austria</h1>
+        <div class="legend">by Alexandru Bratosin</div>
+        
+        <div class="scroll-container" id="hud-container">
+            </div>
+    </div>
+
+    <div id="instructions">🖱️ CLICK OBJECTS OR HUD ITEMS TO FOCUS | DRAG TO ROTATE</div>
+
+    <script>
+        /**
+         * @fileoverview Austria Interactive 3D Map (Corrected Boundaries & Position Placements)
+         * @author Alexandru Bratosin
+         */
+
+        // --- 1. ENGINE & ENVIRONMENTAL SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xd1d9e6); 
+        scene.fog = new THREE.FogExp2(0xd1d9e6, 0.008);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 40, 55);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 2. LIGHTING CONFIGURATIONS ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); 
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 0.9); 
+        sunLight.position.set(30, 50, 20);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        
+        const d = 40;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        scene.add(sunLight);
+
+        // --- 3. GENERATE PROCEDURAL MAP TEXTURE SYSTEM ---
+        const textureCanvas = document.createElement('canvas');
+        textureCanvas.width = 1024;
+        textureCanvas.height = 1024;
+        const tCtx = textureCanvas.getContext('2d');
+
+        tCtx.fillStyle = '#4c7843';
+        tCtx.fillRect(0, 0, 1024, 1024);
+
+        for (let i = 0; i < 4000; i++) {
+            let x = Math.random() * 1024;
+            let y = Math.random() * 1024;
+            let weight = (1024 - x) / 1024 * 0.75 + (1 - Math.abs(y - 530) / 512) * 0.25;
+            if (Math.random() < weight) {
+                let radius = 20 + Math.random() * 65;
+                let grad = tCtx.createRadialGradient(x, y, 0, x, y, radius);
+                grad.addColorStop(0, '#8b8378'); 
+                grad.addColorStop(0.3, '#6e705c'); 
+                grad.addColorStop(0.7, '#556b2f'); 
+                grad.addColorStop(1, 'rgba(76, 120, 67, 0)');
+                tCtx.fillStyle = grad;
+                tCtx.beginPath(); tCtx.arc(x, y, radius, 0, Math.PI * 2); tCtx.fill();
+            }
+        }
+
+        tCtx.strokeStyle = '#3d677a';
+        tCtx.lineWidth = 14;
+        tCtx.lineCap = 'round';
+        tCtx.lineJoin = 'round';
+        tCtx.beginPath();
+        tCtx.moveTo(0, 320); 
+        tCtx.bezierCurveTo(300, 300, 500, 420, 800, 360); 
+        tCtx.lineTo(1024, 400);
+        tCtx.stroke();
+
+        const geoMapTexture = new THREE.CanvasTexture(textureCanvas);
+
+        // --- 4. CORRECTED GEOGRAPHIC ELEVATION MAP MESH ---
+        const austriaShape = new THREE.Shape();
+        austriaShape.moveTo(-26.5, 2.5); // FIXED: Extended further West to natively accommodate Bregenz/Vorarlberg
+        austriaShape.lineTo(-15, 8);    
+        austriaShape.lineTo(5, 12);     
+        austriaShape.lineTo(22, 10);    
+        austriaShape.lineTo(25, 0);     
+        austriaShape.lineTo(18, -10);   
+        austriaShape.lineTo(5, -8);     
+        austriaShape.lineTo(-10, -5);   // FIXED: Lowered slightly for accurate southern mountain width corridor
+        austriaShape.lineTo(-26.5, -1.0); // FIXED: Secure base tracking shape for western expansion loops
+        austriaShape.lineTo(-26.5, 2.5);    
+
+        const extrudeSettings = { depth: 1.2, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.18, bevelThickness: 0.18 };
+        const mapGeometry = new THREE.ExtrudeGeometry(austriaShape, extrudeSettings);
+        mapGeometry.rotateX(-Math.PI / 2); 
+        mapGeometry.center();
+
+        const mapMaterial = new THREE.MeshStandardMaterial({
+            map: geoMapTexture,
+            roughness: 0.8,
+            metalness: 0.1,
+            bumpMap: geoMapTexture,
+            bumpScale: 0.15
+        });
+        
+        const austriaMesh = new THREE.Mesh(mapGeometry, mapMaterial);
+        austriaMesh.castShadow = true;
+        austriaMesh.receiveShadow = true;
+        scene.add(austriaMesh);
+
+        // --- 5. COMPILING PLACEMENT DATA REGISTRY ---
+        const sights = [
+            { id: 0, name: "Vienna (Wien)", x: 18, z: 2, color: 0xc6001a, type: 'gothic', desc: "St. Stephen's Cathedral & Schönbrunn Palace" },
+            { id: 1, name: "Salzburg", x: -2, z: 1, color: 0xd4af37, type: 'citadel', desc: "Hohensalzburg Fortress & Mirabell Palace" },
+            { id: 2, name: "Innsbruck", x: -14, z: 3, color: 0x4a90e2, type: 'lodge', desc: "Golden Roof & Ambras Castle" },
+            { id: 3, name: "Graz", x: 13, z: -4, color: 0x50e3c2, type: 'clock', desc: "Schlossberg Clock Tower (Uhrturm)" },
+            { id: 4, name: "Hallstatt", x: 2, z: 0, color: 0xb8e986, type: 'spire', desc: "UNESCO Heritage Village & Salt Mines" },
+            { id: 5, name: "Grossglockner", x: -7, z: -2, color: 0xffffff, type: 'peak', desc: "Austria's Highest Alpine Peak & Glacier Region" },
+            { id: 6, name: "Melk Abbey", x: 10, z: 3, color: 0xf5a623, type: 'monastery', desc: "Historic Baroque Benedictine Monastery on the Danube" },
+            { id: 7, name: "Bregenz", x: -22.5, z: 1.5, color: 0x9013fe, type: 'stage', desc: "Lake Constance (Bodensee) & Floating Stage" }, // FIXED: Repositioned coordinates safely inward on expanded landscape mesh
+            { id: 8, name: "Linz", x: 6, z: 4, color: 0x4a4a4a, type: 'square', desc: "Ars Electronica Center & Historic Main Square" },
+            { id: 9, name: "Klagenfurt", x: 6, z: -5, color: 0xbd10e0, type: 'dragon', desc: "Wörthersee Alpine Lake & Lindwurm Monument" }
+        ];
+
+        const sightsGroup = new THREE.Group();
+        scene.add(sightsGroup);
+
+        const hudContainer = document.getElementById('hud-container');
+        
+        sights.forEach((sight, index) => {
+            const item = document.createElement('div');
+            item.className = 'location-item';
+            item.id = `hud-item-${index}`;
+            item.innerHTML = `📍 <b>${sight.name}</b><br>• ${sight.desc}`;
+            item.addEventListener('click', () => selectSight(index, true));
+            hudContainer.appendChild(item);
+
+            const containerGroup = new THREE.Group();
+            containerGroup.position.set(sight.x, 1.2, sight.z);
+            containerGroup.userData = { sightIndex: index }; 
+
+            const rodGeom = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 8);
+            const brassMat = new THREE.MeshStandardMaterial({ color: 0xbf9b30, metalness: 0.7, roughness: 0.2 });
+            const rod = new THREE.Mesh(rodGeom, brassMat);
+            rod.position.y = 0.75;
+            containerGroup.add(rod);
+
+            const sphereGeom = new THREE.SphereGeometry(0.25, 12, 12);
+            const markerMat = new THREE.MeshStandardMaterial({ color: sight.color, roughness: 0.4 });
+            const head = new THREE.Mesh(sphereGeom, markerMat);
+            head.position.y = 1.5;
+            containerGroup.add(head);
+
+            let modelMesh;
+            const monumentMaterial = new THREE.MeshStandardMaterial({ color: 0xded9d2, roughness: 0.6 });
+
+            if (sight.type === 'gothic') {
+                modelMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 2.6), monumentMaterial);
+                const tower = new THREE.Mesh(new THREE.ConeGeometry(0.4, 2.8, 6), monumentMaterial);
+                tower.position.set(0, 1.8, 0.4);
+                modelMesh.add(tower);
+            } 
+            else if (sight.type === 'citadel') {
+                modelMesh = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.2, 1.6), monumentMaterial);
+                const t = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.8, 8), monumentMaterial);
+                t.position.set(-0.8, 0.4, 0); const t2 = t.clone(); t2.position.set(0.8, 0.4, 0);
+                modelMesh.add(t, t2);
+            } 
+            else if (sight.type === 'peak') {
+                const snowMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
+                modelMesh = new THREE.Mesh(new THREE.ConeGeometry(1.8, 4.0, 5), snowMat);
+            } 
+            else if (sight.type === 'monastery') {
+                modelMesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.0, 3.2), monumentMaterial);
+                const dome = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshStandardMaterial({color: 0x4a634d}));
+                dome.position.set(0, 0.7, 0);
+                modelMesh.add(dome);
+            }
+            else if (sight.type === 'clock') {
+                modelMesh = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.0, 1.0), monumentMaterial);
+                const cap = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.8, 4), new THREE.MeshStandardMaterial({color: 0xa0522d}));
+                cap.position.y = 1.3; cap.rotation.y = Math.PI/4;
+                modelMesh.add(cap);
+            }
+            else {
+                modelMesh = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.2, 1.0), monumentMaterial);
+                const spire = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1.5, 4), monumentMaterial);
+                spire.position.y = 1.2;
+                modelMesh.add(spire);
+            }
+
+            modelMesh.position.y = 3.2;
+            containerGroup.add(modelMesh);
+
+            containerGroup.traverse(node => { if(node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
+            sightsGroup.add(containerGroup);
+        });
+
+        // --- 6. CAMERA INTERACTION LOGIC MAPS ---
+        let selectedIndex = -1;
+        let isDragging = false;
+        let pointerMoved = false; 
+        let prevMousePos = { x: 0, y: 0 };
+        
+        let targetRotationY = -0.3;
+        let targetRotationX = 0.5;
+
+        const raycaster = new THREE.Raycaster();
+        const mouseCoordinates = new THREE.Vector2();
+
+        window.addEventListener('mousedown', (e) => { 
+            isDragging = true; 
+            pointerMoved = false;
+            prevMousePos = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const dMove = { x: e.clientX - prevMousePos.x, y: e.clientY - prevMousePos.y };
+                if (Math.abs(dMove.x) > 2 || Math.abs(dMove.y) > 2) pointerMoved = true;
+                
+                targetRotationY += dMove.x * 0.005;
+                targetRotationX += dMove.y * 0.005;
+                targetRotationX = Math.max(0.1, Math.min(Math.PI / 2.3, targetRotationX));
+            }
+            prevMousePos = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            isDragging = false;
+            if (!pointerMoved) {
+                mouseCoordinates.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouseCoordinates.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                
+                raycaster.setFromCamera(mouseCoordinates, camera);
+                const intersects = raycaster.intersectObjects(sightsGroup.children, true);
+
+                if (intersects.length > 0) {
+                    let obj = intersects[0].object;
+                    while (obj.parent && !obj.userData.hasOwnProperty('sightIndex')) {
+                        obj = obj.parent;
+                    }
+                    if (obj.userData.hasOwnProperty('sightIndex')) {
+                        selectSight(obj.userData.sightIndex, false);
+                    }
+                }
+            }
+        });
+
+        function selectSight(index, triggerFromHUD) {
+            selectedIndex = index;
+            const data = sights[index];
+
+            document.querySelectorAll('.location-item').forEach(el => el.classList.remove('active'));
+            const activeHUDNode = document.getElementById(`hud-item-${index}`);
+            if(activeHUDNode) {
+                activeHUDNode.classList.add('active');
+                if(!triggerFromHUD) activeHUDNode.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            targetRotationY = -data.x * 0.05; 
+            targetRotationX = 0.6; 
+        }
+
+        window.addEventListener('wheel', (e) => {
+            camera.position.z += e.deltaY * 0.04;
+            camera.position.y += e.deltaY * 0.03;
+            camera.position.z = Math.max(20, Math.min(100, camera.position.z));
+            camera.position.y = Math.max(15, Math.min(80, camera.position.y));
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- 7. FLUID RENDER LOOP TICK MATRIX ---
+        const clock = new THREE.Clock();
+
+        function loop() {
+            requestAnimationFrame(loop);
+            const time = clock.getElapsedTime();
+
+            austriaMesh.rotation.y += (targetRotationY - austriaMesh.rotation.y) * 0.08;
+            sightsGroup.rotation.y = austriaMesh.rotation.y;
+            scene.rotation.x += (targetRotationX - scene.rotation.x) * 0.08;
+
+            sightsGroup.children.forEach((group, i) => {
+                const pulseFactor = (i === selectedIndex) ? (Math.sin(time * 5) * 0.15 + 1.15) : 1.0;
+                
+                group.children.forEach(child => {
+                    if (child.geometry.type === "BoxGeometry" || child.geometry.type === "ConeGeometry" || child.geometry.type === "CylinderGeometry" && child.position.y > 2) {
+                        child.rotation.y = time * 0.3 + (i * 0.2);
+                        child.scale.set(pulseFactor, pulseFactor, pulseFactor);
+                    } else if (child.geometry.type === "SphereGeometry") {
+                        child.scale.set(pulseFactor, pulseFactor, pulseFactor);
+                    }
+                });
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
