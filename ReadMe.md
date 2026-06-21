@@ -11,6 +11,7 @@ HTML5 and Three.js are needed from the internet for the browser games.
 
 <img width="947" height="427" alt="image" src="https://github.com/user-attachments/assets/d0fd24fb-a571-4080-85b3-af8b54256260" />
 <br>
+<br>
 
 #SolarSytem-js.html
 
@@ -21,27 +22,31 @@ HTML5 and Three.js are needed from the internet for the browser games.
 
 <img width="948" height="427" alt="Screenshot 2026-06-21 084220" src="https://github.com/user-attachments/assets/20263fda-268e-48e5-a6a3-1e6eb3c13b47" />
 <br>
+<br>
 
 #Sniper-js.html
 
 <img width="944" height="427" alt="Screenshot 2026-06-20 212653" src="https://github.com/user-attachments/assets/13be7661-1280-46ef-b736-0550566ff188" />
+<br>
 <br>
 
 #CosmicHoroscop-js.html
 
 <img width="947" height="431" alt="image" src="https://github.com/user-attachments/assets/30709c94-cbd9-4241-a3bd-fe04f8536cd7" />
 <br>
+<br>
 
 #Run-Powershell.ps1
 
 <img width="515" height="316" alt="Screenshot 2026-06-20 205613" src="https://github.com/user-attachments/assets/4e3fe099-ecab-461d-8035-5042c8a43a86" />
+<br>
 <br>
 
 #Snake-Powershell.ps1
 
 <img width="363" height="316" alt="Screenshot 2026-06-20 210047" src="https://github.com/user-attachments/assets/4700610a-1d8e-407f-87fc-64e5569aab6b" />
 <br>
-
+<br>
 
 
 
