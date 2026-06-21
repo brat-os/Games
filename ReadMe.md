@@ -1,6 +1,6 @@
 Please read the license file that applies to all listed games.
 Powershell games need Powerhsell ISE to run.
-HTML5 and Three.js are needed from the internet for the browser games.
+JavaScript games need HTML5 and a internet connection to run.
 
 #Done3D-js.html
 
@@ -16,6 +16,7 @@ HTML5 and Three.js are needed from the internet for the browser games.
 #SolarSytem-js.html
 
 <img width="945" height="434" alt="Screenshot 2026-06-20 211757" src="https://github.com/user-attachments/assets/d4b82870-cc9a-41ec-bbe0-30574e61114b" />
+<br>
 <br>
 
 #AustriaMap-js.html
