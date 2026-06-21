@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Cyber Drone Evader</title>
+    <title>Drone Runner</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #030206;
+            background-color: #020107;
             font-family: 'Consolas', monospace;
             color: #ffffff;
             user-select: none;
@@ -22,52 +22,57 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(8, 4, 16, 0.85);
+            background: rgba(5, 2, 15, 0.85);
             padding: 15px 25px;
             border-radius: 6px;
-            border: 1px solid #ff007f;
-            box-shadow: 0 0 15px rgba(255, 0, 127, 0.25);
+            border: 1px solid #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
             pointer-events: none;
+            z-index: 10;
         }
-        h1 { margin: 0 0 5px 0; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; color: #ff007f; }
-        p { margin: 3px 0; font-size: 13px; color: #00ffff; }
+        h1 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; color: #00ffff; }
+        .legend { margin: 2px 0 10px 0; font-size: 11px; color: #da70d6; text-transform: uppercase; letter-spacing: 1px; }
+        p { margin: 3px 0; font-size: 13px; color: #ff007f; }
         
         #game-over-screen {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(5, 2, 10, 0.95);
-            border: 2px solid #00ffff;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+            background: rgba(3, 1, 8, 0.95);
+            border: 2px solid #ff007f;
+            box-shadow: 0 0 30px rgba(255, 0, 127, 0.35);
             padding: 30px;
             border-radius: 10px;
             text-align: center;
-            display: none;
             z-index: 5;
+            display: none;
         }
     </style>
 </head>
 <body>
 
     <div id="hud">
-        <h1>Skyrunner Matrix</h1>
-        <p>Distance: <span id="score-val">0</span>m</p>
-        <p style="color: #ffaa00; margin-top: 5px;">• Controls: W,A,S,D or Arrow Keys</p>
+        <h1>Drone Runner</h1>
+        <div class="legend">by Alexandru Bratosin</div>
+        <p>Distance Score: <span id="score-val">0</span>m</p>
+        <p style="color: #00ffff;">Risk Multiplier: <span id="speed-val">1.0</span>x</p>
+        <p style="color: #ffffff; margin-top: 5px;">• Vector Lift: W / S or Up / Down</p>
     </div>
 
     <div id="game-over-screen">
-        <h2 style="color: #ff007f; margin: 0 0 10px 0; font-size: 24px;">DRONE DISINTEGRATED</h2>
+        <h2 style="color: #ff007f; margin: 0 0 10px 0; font-size: 26px;">SYSTEM IMPACT TERMINATION</h2>
         <p id="final-score" style="color: #ffffff; font-size: 14px; margin-bottom: 20px;"></p>
-        <p style="color: #00ffff; font-size: 12px; animation: pulse 1.5s infinite;">Press ANY KEY to reboot system</p>
+        <p style="color: #00ffff; font-size: 12px;">Press ANY KEY to reboot drone software</p>
     </div>
 
     <canvas id="flightCanvas"></canvas>
 
     <script>
         /**
-         * @fileoverview Visually Stunning Cyberpunk Drone Obstacle Runner
+         * @fileoverview Drone Runner (2D Side-Scroller Prototype)
          * @author Alexandru Bratosin
+         * @description Pure 2D High-Speed Side-Scrolling Escalating Difficulty Flight Matrix
          */
 
         const canvas = document.getElementById('flightCanvas');
@@ -80,79 +85,184 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Game Configuration Settings
+        // --- AUDIO COMPONENT ---
+        let audioCtx = null;
+        let engineOsc = null;
+        let engineGain = null;
+        let lowPassFilter = null;
+        let musicStep = 0;
+        let musicInterval = null;
+
+        const basslineNotes = [55.00, 55.00, 48.99, 48.99, 65.41, 65.41, 58.27, 51.91]; 
+
+        function startAudioEngine() {
+            if (audioCtx) {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                return; 
+            }
+            
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                engineOsc = audioCtx.createOscillator();
+                engineGain = audioCtx.createGain();
+                lowPassFilter = audioCtx.createBiquadFilter();
+                
+                engineOsc.type = 'triangle'; 
+                engineOsc.frequency.setValueAtTime(65, audioCtx.currentTime); 
+                
+                lowPassFilter.type = 'lowpass';
+                lowPassFilter.frequency.setValueAtTime(140, audioCtx.currentTime); 
+                engineGain.gain.setValueAtTime(0.18, audioCtx.currentTime); 
+                
+                engineOsc.connect(lowPassFilter);
+                lowPassFilter.connect(engineGain);
+                engineGain.connect(audioCtx.destination);
+                engineOsc.start();
+
+                if (!musicInterval) {
+                    musicInterval = setInterval(playMusicTick, 230);
+                }
+            } catch(e) {
+                console.log("Audio waiting for player initialization...");
+            }
+        }
+
+        function playMusicTick() {
+            if (isGameOver || !audioCtx || audioCtx.state === 'suspended') return;
+            try {
+                let noteHz = basslineNotes[musicStep % basslineNotes.length];
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                let filter = audioCtx.createBiquadFilter();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(noteHz, audioCtx.currentTime);
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(180, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.06, audioCtx.currentTime); 
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.22);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.22);
+                musicStep++;
+            } catch(e) {}
+        }
+
+        function playScoreSound() {
+            if (!audioCtx || audioCtx.state === 'suspended') return;
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
+                osc.frequency.exponentialRampToValueAtTime(1174.66, audioCtx.currentTime + 0.15); 
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } catch(e) {}
+        }
+
+        function playCrashSound() {
+            if (!audioCtx || audioCtx.state === 'suspended') return;
+            try {
+                let bufferSize = audioCtx.sampleRate * 0.5; 
+                let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                let data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }
+                let noiseNode = audioCtx.createBufferSource();
+                noiseNode.buffer = buffer;
+                let filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(200, audioCtx.currentTime);
+                let gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                noiseNode.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noiseNode.start();
+            } catch(e) {}
+        }
+
+        // --- 2D SYSTEM MATRIX REGISTRY ---
         let score = 0;
         let isGameOver = false;
         let keys = {};
+        let frameCount = 0;
+        
+        let scrollSpeed = 6.0; 
+        let speedMultiplier = 1.0;
 
-        // --- 1. Entity Object Structures ---
-        const drone = {
-            x: 150,
+        const drone2D = {
+            x: 120,
             y: window.innerHeight / 2,
-            vx: 0,
+            radius: 20,
             vy: 0,
-            speed: 0.6,
-            friction: 0.92,
-            width: 50,
-            height: 20,
-            tilt: 0
+            acceleration: 0.65,
+            friction: 0.90
         };
 
         let obstacles = [];
-        let particles = [];
-        let backdropBuildings = [];
+        let backgroundStars = [];
+        let nebulaPasses = [];
 
-        // Build Multi-Layered Parallax Neon Sky Scrapers Background
-        function initBackdrop() {
-            backdropBuildings = [];
-            // Layer 1 (Distant Silhouette Horizon)
-            for (let i = 0; i < 15; i++) {
-                backdropBuildings.push({
-                    x: i * 140,
-                    width: 100 + Math.random() * 80,
-                    height: 180 + Math.random() * 200,
-                    layer: 1,
-                    color: '#0d0a1a'
+        function init2DEnvironment() {
+            backgroundStars = [];
+            nebulaPasses = [];
+            obstacles = [];
+
+            for (let i = 0; i < 120; i++) {
+                backgroundStars.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    size: 1 + Math.random() * 2,
+                    speed: 0.5 + Math.random() * 1.5
                 });
             }
-            // Layer 2 (Midground Neon Profiles)
-            for (let i = 0; i < 12; i++) {
-                backdropBuildings.push({
-                    x: i * 220,
-                    width: 120 + Math.random() * 100,
-                    height: 250 + Math.random() * 250,
-                    layer: 2,
-                    color: '#16112c',
-                    accent: '#ff007f'
+
+            for (let i = 0; i < 3; i++) {
+                nebulaPasses.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    size: 120 + Math.random() * 100,
+                    color: ['rgba(138, 43, 226, 0.06)', 'rgba(255, 0, 127, 0.04)', 'rgba(0, 255, 255, 0.04)'][i % 3]
                 });
             }
         }
-        initBackdrop();
+        init2DEnvironment();
 
-        // Obstacle Factory
-        function spawnObstacle() {
-            let width = 40 + Math.random() * 30;
-            let height = 150 + Math.random() * (canvas.height - 350);
-            let isTopGate = Math.random() > 0.5;
+        function spawnGateObstacle() {
+            let gapHeight = 150; 
+            let minimumBorder = 80;
+            let targetY = minimumBorder + Math.random() * (canvas.height - gapHeight - (minimumBorder * 2));
 
             obstacles.push({
-                x: canvas.width + 100,
-                y: isTopGate ? 0 : canvas.height - height,
-                width: width,
-                height: height,
-                color: ['#00ffff', '#bd00ff', '#ff0055'][Math.floor(Math.random() * 3)],
-                pulseOffset: Math.random() * Math.PI
+                x: canvas.width + 50,
+                topY: targetY,
+                gap: gapHeight,
+                width: 45,
+                passed: false,
+                color: ['#00ffff', '#bd00ff', '#ff0055'][Math.floor(Math.random() * 3)]
             });
         }
 
-        // --- 2. Key Bindings Processing Hooks ---
         window.addEventListener('keydown', (e) => {
+            startAudioEngine(); 
             if (isGameOver) {
                 resetGame();
                 return;
             }
             keys[e.key.toLowerCase()] = true;
-            keys[e.key] = true; // Support alternative arrows triggers
+            keys[e.key] = true;
         });
         window.addEventListener('keyup', (e) => {
             keys[e.key.toLowerCase()] = false;
@@ -161,208 +271,169 @@
 
         function resetGame() {
             score = 0;
+            scrollSpeed = 6.0;
+            speedMultiplier = 1.0;
             isGameOver = false;
-            obstacles = [];
-            particles = [];
-            drone.y = canvas.height / 2;
-            drone.vx = 0;
-            drone.vy = 0;
+            drone2D.y = canvas.height / 2;
+            drone2D.vy = 0;
             document.getElementById('game-over-screen').style.display = 'none';
-            initBackdrop();
+            document.getElementById('speed-val').innerText = "1.0";
+            if (engineGain) engineGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            init2DEnvironment();
+            spawnGateObstacle();
         }
 
-        // --- 3. Core Physics Real-Time Transformation Loops ---
-        let frameCount = 0;
-        let globalGameSpeed = 4.5;
-
-        function runFlightEngine() {
-            requestAnimationFrame(runFlightEngine);
+        function runGameLoop() {
+            requestAnimationFrame(runGameLoop);
             frameCount++;
 
-            // Global Vector Clear
-            ctx.fillStyle = '#04020a';
+            ctx.fillStyle = '#020106';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // A. UPDATE & DRAW PARALLAX BACKDROP SCENERY
-            backdropBuildings.forEach(b => {
-                // Shift backdrop vectors relative to the defined speed tier multiplier
-                let scrollModifier = b.layer === 1 ? 0.4 : 1.2;
-                b.x -= scrollModifier;
+            nebulaPasses.forEach(neb => {
+                if (!isGameOver) neb.x -= scrollSpeed * 0.2;
+                if (neb.x + neb.size < 0) { neb.x = canvas.width + neb.size; neb.y = Math.random() * canvas.height; }
                 
-                if (b.x + b.width < 0) b.x = canvas.width + 50;
+                ctx.save();
+                let glow = ctx.createRadialGradient(neb.x, neb.y, 5, neb.x, neb.y, neb.size);
+                glow.addColorStop(0, neb.color);
+                glow.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = glow;
+                ctx.beginPath(); ctx.arc(neb.x, neb.y, neb.size, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            });
 
-                ctx.fillStyle = b.color;
-                ctx.fillRect(b.x, canvas.height - b.height, b.width, b.height);
-
-                // Draw neon window profile hashes on Layer 2 Midground blocks
-                if (b.layer === 2) {
-                    ctx.strokeStyle = b.accent;
-                    ctx.lineWidth = 1;
-                    ctx.globalAlpha = 0.15;
-                    ctx.strokeRect(b.x, canvas.height - b.height, b.width, b.height);
-                    ctx.globalAlpha = 1.0;
-                }
+            ctx.fillStyle = '#ffffff';
+            backgroundStars.forEach(star => {
+                if (!isGameOver) star.x -= star.speed;
+                if (star.x < 0) star.x = canvas.width;
+                ctx.fillRect(star.x, star.y, star.size, star.size);
             });
 
             if (isGameOver) {
-                drawDrone();
                 drawObstacles();
+                drawSideScrollerDrone();
                 return;
             }
 
-            // B. COMPUTE FLIGHT COMMAND INPUT FORCES
-            if (keys['w'] || keys['ArrowUp']) drone.vy -= drone.speed;
-            if (keys['s'] || keys['ArrowDown']) drone.vy += drone.speed;
-            if (keys['a'] || keys['ArrowLeft']) drone.vx -= drone.speed;
-            if (keys['d'] || keys['ArrowRight']) drone.vx += drone.speed;
+            if (keys['w'] || keys['arrowup']) drone2D.vy -= drone2D.acceleration;
+            if (keys['s'] || keys['arrowdown']) drone2D.vy += drone2D.acceleration;
 
-            // Apply friction vectors to structural velocities
-            drone.vx *= drone.friction;
-            drone.vy *= drone.friction;
-            drone.x += drone.vx;
-            drone.y += drone.vy;
+            drone2D.vy *= drone2D.friction;
+            drone2D.y += drone2D.vy;
 
-            // Mathematical calculation setting flight bank tilts dynamically mapping forward velocities
-            drone.tilt = (drone.vy * 0.03) + (drone.vx * 0.01);
+            if (drone2D.y - drone2D.radius < 0) { drone2D.y = drone2D.radius; drone2D.vy = 0; }
+            if (drone2D.y + drone2D.radius > canvas.height) { drone2D.y = canvas.height - drone2D.radius; drone2D.vy = 0; }
 
-            // Keep drone strictly trapped inside viewport borders
-            drone.x = Math.max(50, Math.min(canvas.width * 0.6, drone.x));
-            drone.y = Math.max(30, Math.min(canvas.height - 30, drone.y));
-
-            // C. RENDER ROTOR FLUID EXHAUST SPARK PARTICLES
-            if (frameCount % 2 === 0) {
-                particles.push({
-                    x: drone.x - 15,
-                    y: drone.y + (Math.random() - 0.5) * 8,
-                    vx: -globalGameSpeed - (Math.random() * 2),
-                    vy: (Math.random() - 0.5) * 2,
-                    alpha: 1.0,
-                    size: 2 + Math.random() * 3,
-                    color: '#00ffff'
-                });
+            if (audioCtx && engineOsc) {
+                let currentPitch = 65 + (Math.abs(drone2D.vy) * 4);
+                engineOsc.frequency.setValueAtTime(currentPitch, audioCtx.currentTime);
             }
 
-            // Update exhaust particles array frame
-            for (let i = particles.length - 1; i >= 0; i--) {
-                let p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.alpha -= 0.03;
-
-                if (p.alpha <= 0) {
-                    particles.splice(i, 1);
-                    continue;
-                }
-
-                ctx.save();
-                ctx.globalAlpha = p.alpha;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = p.color;
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x, p.y, p.size, p.size);
-                ctx.restore();
-            }
-
-            // D. MANAGE OBSTACLES SPACES
-            if (frameCount % 90 === 0) {
-                spawnObstacle();
-                score += 10;
-                document.getElementById('score-val').innerText = score;
-                if (score % 50 === 0) globalGameSpeed += 0.5; // Scaled difficulty multiplier acceleration
+            let spawnWindow = Math.max(70, 150 - Math.floor(score * 0.4));
+            if (frameCount % spawnWindow === 0) {
+                spawnGateObstacle();
             }
 
             drawObstacles();
-            drawDrone();
 
-            // E. EVALUATE CRITICAL HULL COLLISION MATRIX MAPPINGS
-            obstacles.forEach(obs => {
-                // Bounding boxes intersection matrix evaluation equations
-                if (drone.x + drone.width / 2 > obs.x && 
-                    drone.x - drone.width / 2 < obs.x + obs.width &&
-                    drone.y + drone.height / 2 > obs.y && 
-                    drone.y - drone.height / 2 < obs.y + obs.height) {
-                    
-                    // Trigger destructive failure crash loops
+            obstacles.forEach(gate => {
+                gate.x -= scrollSpeed;
+
+                let withinXRange = (drone2D.x + drone2D.radius > gate.x) && (drone2D.x - drone2D.radius < gate.x + gate.width);
+                let hittingTopPillar = drone2D.y - drone2D.radius < gate.topY;
+                let hittingBottomPillar = drone2D.y + drone2D.radius > gate.topY + gate.gap;
+
+                if (withinXRange && (hittingTopPillar || hittingBottomPillar)) {
                     isGameOver = true;
-                    document.getElementById('final-score').innerText = `Traveled Vector Path: ${score} meters`;
+                    playCrashSound();
+                    if (engineGain) engineGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                    document.getElementById('final-score').innerText = `Flight Path Cleared: ${score} meters`;
                     document.getElementById('game-over-screen').style.display = 'block';
                 }
+
+                if (!gate.passed && gate.x + gate.width < drone2D.x) {
+                    gate.passed = true;
+                    score += 50;
+                    scrollSpeed += 0.4; 
+                    speedMultiplier = (scrollSpeed / 6.0).toFixed(1);
+                    document.getElementById('speed-val').innerText = speedMultiplier;
+                    document.getElementById('score-val').innerText = score;
+                    playScoreSound();
+                }
+            });
+
+            if (obstacles.length > 0 && obstacles[0].x + obstacles[0].width < -100) {
+                obstacles.shift();
+            }
+
+            drawSideScrollerDrone();
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(gate => {
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = gate.color;
+                ctx.fillStyle = gate.color;
+
+                ctx.fillRect(gate.x, 0, gate.width, gate.topY);
+                ctx.fillRect(gate.x, gate.topY + gate.gap, gate.width, canvas.height - (gate.topY + gate.gap));
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(gate.x - 2, gate.topY - 4, gate.width + 4, 4);
+                ctx.fillRect(gate.x - 2, gate.topY + gate.gap, gate.width + 4, 4);
+                ctx.restore();
             });
         }
 
-        // --- 4. Sub-Rendering Graphical Composers ---
-        function drawDrone() {
+        function drawSideScrollerDrone() {
             ctx.save();
-            ctx.translate(drone.x, drone.y);
-            ctx.rotate(drone.tilt);
+            ctx.translate(drone2D.x, drone2D.y);
 
-            // Apply vibrant cyberpunk glowing drop-shadows around drone geometry lines
+            let tiltRotation = drone2D.vy * 0.04;
+            ctx.rotate(tiltRotation);
+
             ctx.shadowBlur = 15;
-            ctx.shadowColor = '#ff007f';
+            ctx.shadowColor = '#00ffff';
 
-            // Main Core Fuselage Frame
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(-20, -4, 40, 8);
-
-            // Outrigger Rotors Wings (Quadcopter Structural Arms)
-            ctx.strokeStyle = '#ff007f';
-            ctx.lineWidth = 3;
+            ctx.fillStyle = '#1e212b';
+            ctx.strokeStyle = '#090a0f';
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(-20, 0); ctx.lineTo(-32, -10);
-            ctx.moveTo(20, 0);  ctx.lineTo(32, -10);
-            ctx.moveTo(-10, 0); ctx.lineTo(-18, 12);
-            ctx.moveTo(10, 0);  ctx.lineTo(18, 12);
+            ctx.moveTo(-25, -6); ctx.lineTo(-15, -12); ctx.lineTo(15, -12); ctx.lineTo(25, 0);
+            ctx.lineTo(15, 12); ctx.lineTo(-15, 12); ctx.lineTo(-25, 6);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+
+            ctx.strokeStyle = '#2d3244';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-15, -12); ctx.lineTo(-5, 12);
+            ctx.moveTo(-5, -12); ctx.lineTo(5, 12);
+            ctx.moveTo(5, -12); ctx.lineTo(15, 12);
             ctx.stroke();
 
-            // Rotor Engine Caps (Glow hubs)
-            ctx.fillStyle = '#00ffff';
-            ctx.shadowColor = '#00ffff';
-            ctx.fillRect(-36, -13, 8, 4);
-            ctx.fillRect(28, -13, 8, 4);
-            ctx.fillRect(-22, 12, 8, 4);
-            ctx.fillRect(14, 12, 8, 4);
+            ctx.fillStyle = '#10121a';
+            ctx.strokeStyle = '#ff0055';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(-15, -12, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(15, -12, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.45)';
+            ctx.lineWidth = 1.5;
+            let bladeOffset = Math.sin(Date.now() * 0.08) * 12;
+            ctx.beginPath(); ctx.moveTo(-27, -12 + bladeOffset * 0.3); ctx.lineTo(-3, -12 - bladeOffset * 0.3); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(3, -12 - bladeOffset * 0.3); ctx.lineTo(27, -12 + bladeOffset * 0.3); ctx.stroke();
+
+            ctx.fillStyle = isGameOver ? '#330011' : '#ff0055';
+            ctx.shadowBlur = isGameOver ? 0 : 15;
+            ctx.shadowColor = '#ff0055';
+            ctx.fillRect(8, -5, 10, 5);
 
             ctx.restore();
         }
 
-        function drawObstacles() {
-            obstacles.forEach((obs, idx) => {
-                if (!isGameOver) obs.x -= globalGameSpeed;
-
-                let pulseSize = Math.sin((frameCount * 0.05) + obs.pulseOffset) * 6;
-
-                ctx.save();
-                ctx.shadowBlur = 20 + pulseSize;
-                ctx.shadowColor = obs.color;
-                
-                // Clear interior column structures fills
-                ctx.fillStyle = 'rgba(10, 5, 20, 0.8)';
-                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
-
-                // High-glowing perimeter energy bounding lines
-                ctx.strokeStyle = obs.color;
-                ctx.lineWidth = 3;
-                ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
-
-                // Inner core frequency beam accent line
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(obs.x + obs.width / 2, obs.y);
-                ctx.lineTo(obs.x + obs.width / 2, obs.y + obs.height);
-                ctx.stroke();
-
-                ctx.restore();
-            });
-
-            // Clean historical elements passing off screen boundaries
-            if (obstacles.length > 0 && obstacles[0].x < -100) {
-                obstacles.shift();
-            }
-        }
-
-        // Launch operational framework execution loops
-        runFlightEngine();
+        runGameLoop();
     </script>
 </body>
 </html>
