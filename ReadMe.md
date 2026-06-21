@@ -1,13 +1,9 @@
 Please read the license file that applies to all listed games.
-Powershell games need Powerhsell ISE to run.
+Powershell games need Powerhsell ISE to run, HTML5 and Three.js ist needed for the browser games.
 
-Run-Powershell.ps1
+DroneRunner-js.hmtl
 
-<img width="515" height="316" alt="Screenshot 2026-06-20 205613" src="https://github.com/user-attachments/assets/4e3fe099-ecab-461d-8035-5042c8a43a86" />
-
-Snake-Powershell.ps1
-
-<img width="363" height="316" alt="Screenshot 2026-06-20 210047" src="https://github.com/user-attachments/assets/4700610a-1d8e-407f-87fc-64e5569aab6b" />
+<img width="945" height="434" alt="Screenshot 2026-06-21 073656" src="https://github.com/user-attachments/assets/bc2a0fe5-644c-4f91-bc1d-8eb759fe8645" />
 
 SolarSytem-js.html
 
@@ -20,6 +16,14 @@ Sniper-js.html
 CosmicHoroscop-js.html
 
 <img width="947" height="431" alt="image" src="https://github.com/user-attachments/assets/30709c94-cbd9-4241-a3bd-fe04f8536cd7" />
+
+Run-Powershell.ps1
+
+<img width="515" height="316" alt="Screenshot 2026-06-20 205613" src="https://github.com/user-attachments/assets/4e3fe099-ecab-461d-8035-5042c8a43a86" />
+
+Snake-Powershell.ps1
+
+<img width="363" height="316" alt="Screenshot 2026-06-20 210047" src="https://github.com/user-attachments/assets/4700610a-1d8e-407f-87fc-64e5569aab6b" />
 
 
 
