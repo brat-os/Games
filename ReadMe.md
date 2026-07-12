@@ -2,11 +2,18 @@ Please read the license file that applies to all listed games.
 Powershell games need Powerhsell ISE to run.
 JavaScript games need HTML5 and a internet connection to run.
 
+#CyberPet-js.html
+
+<img width="947" height="433" alt="image" src="https://github.com/user-attachments/assets/0bd8d1fc-4054-408f-980b-df1298eed51e" />
+<br>
+<br>
+
 #Done3D-js.html
 
 <img width="946" height="433" alt="Screenshot 2026-06-21 080859" src="https://github.com/user-attachments/assets/cd76bbf1-29fe-438c-8f6b-6b08c6cf519b" />
 <br>
 <br>
+
 #DroneRunner-js.hmtl
 
 <img width="947" height="427" alt="image" src="https://github.com/user-attachments/assets/d0fd24fb-a571-4080-85b3-af8b54256260" />
