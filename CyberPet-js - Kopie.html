@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberPet - Deluxe Edition by Alexandru Bratosin</title>
+    <style>
+        :root {
+            --bg-color: #f0fdf4;
+            --device-bg: #1e293b;
+            --screen-bg: #86efac;
+            --pixel-color: #064e3b;
+            --btn-color: #ef4444;
+            --btn-press: #b91c1c;
+            --text-main: #064e3b;
+            --bar-bg: #a7f3d0;
+            --font: "Courier New", Courier, monospace;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font);
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        .device {
+            background-color: var(--device-bg);
+            width: 340px;
+            height: 540px;
+            border-radius: 40px 40px 60px 60px;
+            padding: 30px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3), inset 0 4px 6px rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .brand {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .screen-bezel {
+            background-color: #0f172a;
+            padding: 15px;
+            border-radius: 15px;
+            width: 100%;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .screen {
+            background-color: var(--screen-bg);
+            border-radius: 5px;
+            height: 220px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid #34d399;
+            box-shadow: inset 0 0 10px rgba(6,78,59,0.2);
+            transition: background-color 1s ease;
+        }
+
+        .screen.night-mode {
+            background-color: #2b7a5a;
+        }
+
+        /* 3D Scrolling Grid Background */
+        .scrolling-grid {
+            position: absolute;
+            bottom: 0;
+            width: 200%;
+            height: 60%;
+            left: -50%;
+            background-image: 
+                linear-gradient(transparent 65%, rgba(6, 78, 59, 0.2) 66%, transparent 68%),
+                linear-gradient(90deg, transparent 48%, rgba(6, 78, 59, 0.15) 50%, transparent 52%);
+            background-size: 100% 15px, 20px 100%;
+            transform: perspective(150px) rotateX(60deg);
+            transform-origin: top;
+            animation: grid-scroll 2s linear infinite;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Scanline effect */
+        .screen::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 12px;
+            padding: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: var(--text-main);
+            z-index: 5;
+            background: rgba(134, 239, 172, 0.8);
+            border-bottom: 2px solid rgba(6, 78, 59, 0.1);
+        }
+
+        .stat-group { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+        .stat-bar { height: 6px; width: 60%; background-color: var(--bar-bg); border: 1px solid var(--pixel-color); border-radius: 3px; overflow: hidden; }
+        .stat-fill { height: 100%; background-color: var(--pixel-color); width: 100%; transition: width 0.3s ease; }
+
+        .time-display {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            z-index: 5;
+            background: var(--screen-bg);
+            padding: 2px 6px;
+            border: 1px solid var(--pixel-color);
+            border-radius: 4px;
+        }
+
+        .pet-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .pet {
+            width: 80px;
+            height: 80px;
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        /* Animations */
+        .bounce { animation: bounce 1.5s infinite; }
+        .sleep-anim { animation: breathe 3s infinite; }
+        .dead-anim { transform: rotate(90deg) translateY(20px); opacity: 0.5; }
+        .excited-jump { animation: fast-jump 0.4s infinite alternate; }
+        .wiggle { animation: wiggle-anim 0.2s infinite alternate; }
+
+        @keyframes bounce { 0%, 100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(-10px) scaleY(1.05); } }
+        @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes fast-jump { 0% { transform: translateY(0); } 100% { transform: translateY(-25px); } }
+        @keyframes wiggle-anim { 0% { transform: rotate(-5deg); } 100% { transform: rotate(5deg); } }
+        @keyframes grid-scroll { 100% { background-position: 0 15px, 0 0; } }
+
+        /* Game Props */
+        .game-prop { position: absolute; fill: var(--pixel-color); z-index: 3; }
+        
+        .food-drop {
+            width: 24px; height: 24px;
+            top: -30px; left: 50%; transform: translateX(-50%);
+            animation: drop-in 0.6s forwards cubic-bezier(0.5, 0, 1, 1);
+        }
+
+        .ball-roll {
+            width: 20px; height: 20px;
+            bottom: 30px; left: -30px;
+            animation: roll-across 2s linear forwards, hop 0.3s infinite alternate;
+        }
+
+        .shower-head {
+            width: 40px; height: 40px;
+            top: -40px; left: 50%; transform: translateX(-50%);
+            animation: drop-in-stop 0.3s forwards;
+        }
+
+        .water-drop {
+            width: 4px; height: 8px;
+            background-color: var(--pixel-color);
+            position: absolute;
+            border-radius: 2px;
+            animation: rain 0.4s linear infinite;
+        }
+
+        .zzz-particle {
+            font-weight: bold; color: var(--pixel-color); position: absolute; opacity: 0;
+            animation: float-up 2s ease-in forwards;
+        }
+
+        @keyframes drop-in { to { top: 60%; } }
+        @keyframes drop-in-stop { to { top: 20px; } }
+        @keyframes roll-across { to { left: 120%; transform: rotate(360deg); } }
+        @keyframes hop { to { bottom: 50px; } }
+        @keyframes rain { 0% { top: 60px; opacity: 1; } 100% { top: 150px; opacity: 0; } }
+        @keyframes float-up { 0% { opacity: 0; transform: translateY(0) translateX(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-40px) translateX(15px) scale(1.5); } }
+
+        .message {
+            position: absolute;
+            bottom: 8px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: var(--text-main);
+            z-index: 5;
+            background: rgba(134, 239, 172, 0.7);
+        }
+
+        /* 2x2 Grid Controls */
+        .controls { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+            width: 100%; 
+            margin-top: 25px; 
+            padding: 0 20px;
+        }
+        
+        .btn-wrapper { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+        .btn-label { color: #cbd5e1; font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+        
+        .btn {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background-color: var(--btn-color);
+            border: none;
+            box-shadow: 0 5px 0 var(--btn-press), inset 0 3px 3px rgba(255,255,255,0.3);
+            cursor: pointer; outline: none; transition: all 0.1s;
+        }
+        .btn:active { transform: translateY(5px); box-shadow: 0 0 0 var(--btn-press), inset 0 3px 3px rgba(255,255,255,0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .speaker { display: flex; gap: 6px; margin-top: 25px; }
+        .speaker-hole { width: 6px; height: 6px; background-color: #0f172a; border-radius: 50%; box-shadow: inset 0 2px 2px rgba(0,0,0,0.5); }
+        .svg-icon { fill: var(--pixel-color); }
+    </style>
+</head>
+<body>
+
+<div class="device">
+    <div class="brand">CYBERPET 3.0 DELUXE by Alexandru Bratosin</div>
+    
+    <div class="screen-bezel">
+        <div id="game-screen" class="screen">
+            <div class="scrolling-grid"></div>
+            
+            <div class="stats-container">
+                <div class="stat-group"><span>HUNGER</span><div class="stat-bar"><div class="stat-fill" id="fill-hunger"></div></div></div>
+                <div class="stat-group"><span>HYGIENE</span><div class="stat-bar"><div class="stat-fill" id="fill-hygiene"></div></div></div>
+                <div class="stat-group"><span>HAPPY</span><div class="stat-bar"><div class="stat-fill" id="fill-happy"></div></div></div>
+                <div class="stat-group"><span>ENERGY</span><div class="stat-bar"><div class="stat-fill" id="fill-energy"></div></div></div>
+            </div>
+
+            <div id="timer-display" class="time-display">Zzz In: --:--</div>
+
+            <div id="pet-container" class="pet-container">
+                <div id="pet-sprite" class="pet bounce"></div>
+            </div>
+
+            <div id="message-box" class="message">System Boot...</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="btn-wrapper"><button class="btn" onclick="game.action('feed')"></button><span class="btn-label">Feed</span></div>
+        <div class="btn-wrapper"><button class="btn" onclick="game.action('shower')"></button><span class="btn-label">Clean</span></div>
+        <div class="btn-wrapper"><button class="btn" onclick="game.action('play')"></button><span class="btn-label">Play</span></div>
+        <div class="btn-wrapper"><button class="btn" onclick="game.action('sleep')"></button><span class="btn-label">Sleep</span></div>
+    </div>
+
+    <div class="speaker">
+        <div class="speaker-hole"></div><div class="speaker-hole"></div><div class="speaker-hole"></div><div class="speaker-hole"></div>
+    </div>
+</div>
+
+<script>
+    const svgs = {
+        idle: `<svg viewBox="0 0 64 64" class="svg-icon"><path d="M32 10 C15 10 10 25 10 40 C10 55 20 60 32 60 C44 60 54 55 54 40 C54 25 49 10 32 10 Z" /><rect x="22" y="25" width="6" height="8" fill="#86efac" /><rect x="36" y="25" width="6" height="8" fill="#86efac" /><path d="M26 42 Q32 48 38 42" stroke="#86efac" stroke-width="3" fill="none" /></svg>`,
+        openMouth: `<svg viewBox="0 0 64 64" class="svg-icon"><path d="M32 10 C15 10 10 25 10 40 C10 55 20 60 32 60 C44 60 54 55 54 40 C54 25 49 10 32 10 Z" /><path d="M22 28 Q25 24 28 28" stroke="#86efac" stroke-width="3" fill="none" /><path d="M36 28 Q39 24 42 28" stroke="#86efac" stroke-width="3" fill="none" /><circle cx="32" cy="45" r="5" fill="#86efac" /></svg>`,
+        chewing: `<svg viewBox="0 0 64 64" class="svg-icon"><path d="M32 10 C15 10 10 25 10 40 C10 55 20 60 32 60 C44 60 54 55 54 40 C54 25 49 10 32 10 Z" /><rect x="22" y="28" width="6" height="2" fill="#86efac" /><rect x="36" y="28" width="6" height="2" fill="#86efac" /><path d="M28 45 L36 45" stroke="#86efac" stroke-width="3" fill="none" /></svg>`,
+        sleeping: `<svg viewBox="0 0 64 64" class="svg-icon"><path d="M32 20 C18 20 10 30 10 45 C10 58 20 60 32 60 C44 60 54 58 54 45 C54 30 46 20 32 20 Z" /><path d="M20 35 L28 35 L20 40 L28 40" stroke="#86efac" stroke-width="2" fill="none" /><path d="M36 35 L44 35 L36 40 L44 40" stroke="#86efac" stroke-width="2" fill="none" /></svg>`,
+        dead: `<svg viewBox="0 0 64 64" class="svg-icon"><path d="M32 10 C15 10 10 25 10 40 C10 55 20 60 32 60 C44 60 54 55 54 40 C54 25 49 10 32 10 Z" /><path d="M20 25 L28 33 M28 25 L20 33" stroke="#86efac" stroke-width="3" fill="none" /><path d="M36 25 L44 33 M44 25 L36 33" stroke="#86efac" stroke-width="3" fill="none" /><line x1="26" y1="45" x2="38" y2="45" stroke="#86efac" stroke-width="3" /></svg>`,
+        
+        food: `<svg viewBox="0 0 32 32" class="game-prop food-drop"><circle cx="16" cy="18" r="10"/><path d="M16 8 Q20 2 24 6" stroke="var(--pixel-color)" stroke-width="3" fill="none"/></svg>`,
+        ball: `<svg viewBox="0 0 32 32" class="game-prop ball-roll" fill="none" stroke="var(--pixel-color)" stroke-width="4"><circle cx="16" cy="16" r="12"/><line x1="16" y1="4" x2="16" y2="28"/><line x1="4" y1="16" x2="28" y2="16"/></svg>`,
+        shower: `<svg viewBox="0 0 32 32" class="game-prop shower-head" fill="none" stroke="var(--pixel-color)" stroke-width="3"><path d="M6 10 C16 10 16 0 26 0"/><line x1="6" y1="10" x2="14" y2="10"/><line x1="10" y1="10" x2="10" y2="16"/><line x1="4" y1="16" x2="16" y2="16"/></svg>`
+    };
+
+    class CyberPet {
+        constructor() {
+            this.state = this.loadState() || { hunger: 100, happy: 100, energy: 100, hygiene: 100, isSleeping: false, isDead: false, lastUpdate: Date.now() };
+            this.isAnimating = false;
+            this.sleepInterval = null;
+            this.clockInterval = null;
+            
+            this.ui = {
+                screen: document.getElementById('game-screen'),
+                container: document.getElementById('pet-container'),
+                sprite: document.getElementById('pet-sprite'),
+                msg: document.getElementById('message-box'),
+                timer: document.getElementById('timer-display'),
+                hunger: document.getElementById('fill-hunger'),
+                happy: document.getElementById('fill-happy'),
+                energy: document.getElementById('fill-energy'),
+                hygiene: document.getElementById('fill-hygiene'),
+                btns: document.querySelectorAll('.btn')
+            };
+
+            this.init();
+        }
+
+        init() {
+            this.calculateOfflineDecay();
+            this.updateUI();
+            
+            if (this.state.isSleeping) this.startSleepEffects();
+            
+            if (!this.state.isDead) {
+                this.loop = setInterval(() => this.tick(), 2000);
+                this.clockInterval = setInterval(() => this.updateClock(), 1000);
+            } else {
+                this.handleDeath();
+            }
+        }
+
+        calculateOfflineDecay() {
+            if (this.state.isDead) return;
+            const mins = (Date.now() - this.state.lastUpdate) / 60000;
+            if (mins > 1) {
+                let decay = Math.floor(mins * 2);
+                if (this.state.isSleeping) {
+                    this.state.energy = Math.min(100, this.state.energy + (decay * 3));
+                    this.state.hunger -= decay * 0.5;
+                    this.state.happy -= decay * 0.5;
+                } else {
+                    this.state.hunger -= decay;
+                    this.state.happy -= decay;
+                    this.state.energy -= decay * 0.5;
+                    this.state.hygiene -= decay * 0.3;
+                }
+                this.checkBounds();
+                this.showMessage(`Gone for ${Math.floor(mins)} mins!`);
+            }
+            this.state.lastUpdate = Date.now();
+        }
+
+        tick() {
+            if (this.state.isDead) return;
+            if (this.state.isSleeping) {
+                this.state.energy += 2;
+                this.state.hunger -= 0.1;
+                this.state.happy -= 0.1;
+                if (this.state.energy >= 100) this.wakeUp();
+            } else {
+                this.state.hunger -= 0.2;
+                this.state.happy -= 0.2;
+                this.state.energy -= 0.1;
+                this.state.hygiene -= 0.05;
+                if (this.state.energy <= 0) this.toggleSleep(true); // Forced sleep
+            }
+            this.state.lastUpdate = Date.now();
+            this.checkBounds();
+            if (!this.isAnimating) this.updateUI();
+            this.saveState();
+        }
+
+        // Calculates real-world time until energy reaches 0 (sleep time)
+        updateClock() {
+            if (this.state.isDead) {
+                this.ui.timer.textContent = "ERR: SYSTEM";
+                return;
+            }
+            if (this.state.isSleeping) {
+                this.ui.timer.textContent = "Sleeping...";
+                return;
+            }
+
+            // Energy depletes at 0.1 per 2 seconds (0.05 per sec)
+            const secondsLeft = Math.floor(this.state.energy / 0.05);
+            const m = Math.floor(secondsLeft / 60).toString().padStart(2, '0');
+            const s = (secondsLeft % 60).toString().padStart(2, '0');
+            
+            this.ui.timer.textContent = `Zzz In: ${m}:${s}`;
+        }
+
+        checkBounds() {
+            ['hunger', 'happy', 'energy', 'hygiene'].forEach(s => this.state[s] = Math.max(0, Math.min(100, this.state[s])));
+            if (this.state.hunger === 0 || this.state.happy === 0 || this.state.hygiene === 0) {
+                this.state.isDead = true;
+                this.handleDeath();
+            }
+        }
+
+        action(type) {
+            if (this.state.isDead) return this.revive();
+            if (this.isAnimating) return; 
+            if (this.state.isSleeping && type !== 'sleep') return this.showMessage("Shh... Sleeping.");
+
+            this.isAnimating = true;
+
+            if (type === 'feed') this.playFeedAnimation();
+            if (type === 'play') this.playGameAnimation();
+            if (type === 'shower') this.playShowerAnimation();
+            if (type === 'sleep') this.toggleSleep(false);
+        }
+
+        playFeedAnimation() {
+            this.state.hunger += 25;
+            this.state.energy -= 5;
+            this.state.hygiene -= 10; // Eating makes them dirty
+            this.showMessage("Feeding...");
+            
+            this.ui.container.insertAdjacentHTML('beforeend', svgs.food);
+            const foodEl = this.ui.container.lastElementChild;
+            this.setSprite('openMouth', 'none');
+
+            setTimeout(() => {
+                if(foodEl) foodEl.remove();
+                this.setSprite('chewing', 'none');
+                let chews = 0;
+                let chewInterval = setInterval(() => {
+                    this.setSprite(chews % 2 === 0 ? 'idle' : 'chewing', 'none');
+                    chews++;
+                    if (chews > 4) {
+                        clearInterval(chewInterval);
+                        this.finishAction("+Food -Clean");
+                    }
+                }, 200);
+            }, 600); 
+        }
+
+        playGameAnimation() {
+            this.state.happy += 25;
+            this.state.energy -= 10;
+            this.state.hygiene -= 15; // Playing makes them very dirty
+            this.showMessage("Playing!");
+            
+            this.ui.container.insertAdjacentHTML('beforeend', svgs.ball);
+            const ballEl = this.ui.container.lastElementChild;
+            this.setSprite('idle', 'excited-jump');
+
+            setTimeout(() => {
+                if(ballEl) ballEl.remove();
+                this.finishAction("+Happy -Clean");
+            }, 2000);
+        }
+
+        playShowerAnimation() {
+            this.state.hygiene += 50;
+            this.showMessage("Scrub scrub...");
+            
+            this.ui.container.insertAdjacentHTML('beforeend', svgs.shower);
+            const showerEl = this.ui.container.lastElementChild;
+            this.setSprite('idle', 'wiggle');
+
+            // Generate rain drops
+            let rainInterval = setInterval(() => {
+                const drop = document.createElement('div');
+                drop.className = 'water-drop';
+                drop.style.left = `${40 + Math.random() * 20}%`;
+                this.ui.container.appendChild(drop);
+                setTimeout(() => drop.remove(), 400);
+            }, 100);
+
+            setTimeout(() => {
+                clearInterval(rainInterval);
+                if(showerEl) showerEl.remove();
+                this.finishAction("All Clean!");
+            }, 2500);
+        }
+
+        toggleSleep(forced) {
+            if (this.state.isSleeping) {
+                this.wakeUp();
+            } else {
+                this.state.isSleeping = true;
+                this.showMessage(forced ? "Exhausted. Passing out." : "Goodnight...");
+                this.startSleepEffects();
+                this.updateUI();
+                this.updateClock(); // Force text update immediately
+            }
+            this.isAnimating = false;
+        }
+
+        startSleepEffects() {
+            this.ui.screen.classList.add('night-mode');
+            this.sleepInterval = setInterval(() => {
+                const z = document.createElement('div');
+                z.className = 'zzz-particle';
+                z.textContent = Math.random() > 0.5 ? 'Z' : 'z';
+                z.style.left = '55%';
+                z.style.top = '40%';
+                this.ui.container.appendChild(z);
+                setTimeout(() => z.remove(), 2000);
+            }, 1000);
+        }
+
+        wakeUp() {
+            this.state.isSleeping = false;
+            this.ui.screen.classList.remove('night-mode');
+            clearInterval(this.sleepInterval);
+            this.showMessage("Good morning!");
+            this.updateUI();
+            this.isAnimating = false;
+        }
+
+        finishAction(msg) {
+            this.checkBounds();
+            this.updateUI();
+            this.showMessage(msg);
+            this.saveState();
+            this.isAnimating = false;
+        }
+
+        handleDeath() {
+            clearInterval(this.loop);
+            clearInterval(this.clockInterval);
+            clearInterval(this.sleepInterval);
+            this.ui.screen.classList.remove('night-mode');
+            this.updateUI();
+            this.showMessage("System Failure. Press to reset.");
+            this.ui.timer.textContent = "ERR: 00:00";
+            this.ui.btns.forEach(b => b.disabled = false);
+        }
+
+        revive() {
+            localStorage.removeItem('cyberpet_save');
+            this.state = { hunger: 100, happy: 100, energy: 100, hygiene: 100, isSleeping: false, isDead: false, lastUpdate: Date.now() };
+            this.isAnimating = false;
+            this.init();
+            this.showMessage("New life!");
+        }
+
+        updateUI() {
+            ['hunger', 'happy', 'energy', 'hygiene'].forEach(stat => {
+                const bar = this.ui[stat];
+                const val = this.state[stat];
+                bar.style.width = `${val}%`;
+                bar.style.backgroundColor = val < 30 ? "#ef4444" : "var(--pixel-color)";
+            });
+
+            if (this.state.isDead) this.setSprite('dead', 'dead-anim');
+            else if (this.state.isSleeping) this.setSprite('sleeping', 'sleep-anim');
+            else if (this.state.hunger < 40 || this.state.happy < 40 || this.state.hygiene < 30) this.setSprite('idle', 'sleep-anim'); 
+            else this.setSprite('idle', 'bounce');
+        }
+
+        setSprite(svgKey, animClass) {
+            this.ui.sprite.innerHTML = svgs[svgKey];
+            this.ui.sprite.className = `pet ${animClass}`;
+        }
+
+        showMessage(t) { this.ui.msg.textContent = t; }
+        saveState() { localStorage.setItem('cyberpet_save', JSON.stringify(this.state)); }
+        loadState() { const s = localStorage.getItem('cyberpet_save'); return s ? JSON.parse(s) : null; }
+    }
+
+    const game = new CyberPet();
+</script>
+
+</body>
+</html>
